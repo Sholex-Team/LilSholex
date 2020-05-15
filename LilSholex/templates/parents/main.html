@@ -1,0 +1,15 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    {% block head %}
+        <title>Sholex | {% block title %}{% endblock %}</title>
+        <link rel="icon" href="{% static 'favicon.png' %}" type="image/png">
+    {% endblock %}
+</head>
+<body>
+    {% block body %}
+    {% endblock %}
+</body>
+</html>

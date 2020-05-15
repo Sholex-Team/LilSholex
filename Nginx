@@ -1,0 +1,4 @@
+FROM nginx:latest
+# Adding Files
+WORKDIR /home/LilSholex
+ADD LilSholex/static static

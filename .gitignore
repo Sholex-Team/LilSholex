@@ -1,0 +1,8 @@
+.idea
+*__pycache__*
+*.c
+*.so
+*migrations*
+*build*
+venv
+*.sqlite3
