@@ -124,6 +124,16 @@ volumes:
 secrets:
   db_password:
     external: true
+  django:
+    external: true
+  anonymous:
+    external: true
+  group:
+    external: true
+  meme:
+    external: true
+  support:
+    external: true
 configs:
   nginx:
     file: nginx/sholex.conf

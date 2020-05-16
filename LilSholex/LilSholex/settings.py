@@ -6,12 +6,16 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '<KEY>'
-MOVIE = '<TOKEN>'
-GROUP = '<TOKEN>'
-MEME = '<TOKEN>'
-SUPPORT = '<TOKEN>'
-ANONYMOUS = '<TOKEN>'
+with open('/run/secrets/django') as django_secret:
+    SECRET_KEY = django_secret.read()
+with open('/run/secrets/group') as group_secret:
+    GROUP = group_secret.read()
+with open('/run/secrets/meme') as meme_secret:
+    MEME = meme_secret.read()
+with open('/run/secrets/support') as support_secret:
+    SUPPORT = support_secret.read()
+with open('/run/secrets/anonymous') as anonymous_secret:
+    ANONYMOUS = anonymous_secret.read()
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 ALLOWED_HOSTS = ['lilsholex']
