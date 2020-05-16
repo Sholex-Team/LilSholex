@@ -134,6 +134,8 @@ secrets:
     external: true
   support:
     external: true
+  admin:
+    external: true
 configs:
   nginx:
     file: nginx/sholex.conf

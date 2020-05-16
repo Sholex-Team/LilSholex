@@ -6,6 +6,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 # SECURITY WARNING: keep the secret key used in production secret!
+with open('/run/secrets/admin') as admin_secret:
+    ADMIN = admin_secret.read()
 with open('/run/secrets/django') as django_secret:
     SECRET_KEY = django_secret.read()
 with open('/run/secrets/group') as group_secret:
