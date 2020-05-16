@@ -55,7 +55,7 @@ services:
         parallelism: 1
         delay: 5s
         order: start-first
-        monitor: 10s
+        monitor: 20s
         failure_action: rollback
       restart_policy:
         max_attempts: 3
@@ -72,7 +72,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 5s
 
   web:
     image: docker.pkg.github.com/sholex-team/lilsholex/nginx:latest
