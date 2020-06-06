@@ -1,10 +1,10 @@
 # Little Sholex
 A Project Containing Telegram API bots and small web apps .
 # Included Projects
-- Persian Meme
-- Group Guard
-- Anonymous Chat
-- Support Bot
+- [Persian Meme](http://t.me/Persian_Meme_Bot)
+- [Group Guard](http://t.me/SholexBot)
+- [Anonymous Chat](http://t.me/AnonymousSholexBot)
+- [Support Bot](http://t.me/SholexSupportbot)
 # Usage
 1. Install Docker
 2. Create a swarm
