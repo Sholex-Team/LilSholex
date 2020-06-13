@@ -53,7 +53,7 @@ not_sent_voice.short_description = 'Turn off Sent Voice'
 class User(admin.ModelAdmin):
     date_hierarchy = 'last_usage_date'
     list_display = ('user_id', 'chat_id', 'menu', 'rank', 'status', 'date', 'username')
-    list_filter = ('status', 'rank', 'sent_message', 'sent_voice', 'vote', 'delete_request')
+    list_filter = ('status', 'rank', 'sent_message', 'sent_voice', 'vote')
     list_per_page = 15
     search_fields = ('chat_id', 'username')
     actions = [export_json, ban_user, full_ban, unban_user, not_sent_voice]
@@ -62,7 +62,7 @@ class User(admin.ModelAdmin):
          {'fields': ('chat_id', 'rank', 'last_date', 'vote', 'username')}
          ),
         ('Status',
-         {'fields': ('count', 'menu', 'status', 'sent_message', 'sent_voice', 'delete_request')}
+         {'fields': ('count', 'menu', 'status', 'sent_message', 'sent_voice')}
          )
     ]
 
@@ -95,3 +95,13 @@ class Ad(admin.ModelAdmin):
     search_fields = ('chat_id', 'message_id', 'seen__chat_id')
     list_filter = ('chat_id',)
     fieldsets = (('Information', {'fields': ('ad_id', 'chat_id', 'message_id', 'seen')}),)
+
+
+@admin.register(models.Delete)
+class Delete(admin.ModelAdmin):
+    list_display = ('delete_id', 'voice', 'user')
+    readonly_fields = ('delete_id',)
+    search_fields = (
+        'delete_id', 'user__username', 'user__chat_id', 'voice__voice_id', 'voice__file_id', 'voice__file_unique_id'
+    )
+    fieldsets = (('Information', {'fields': ('delete_id', 'voice', 'user')}),)

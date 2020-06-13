@@ -9,6 +9,8 @@ services:
     command: --default-authentication-plugin=mysql_native_password
     environment:
       MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_password
+      MYSQL_USER: 'django'
+      MYSQL_PASSWORD: 'rrr@!#73923'
       MYSQL_DATABASE: 'sholex'
     secrets:
       - db_password
@@ -16,7 +18,7 @@ services:
       replicas: 1
       placement:
         constraints:
-          - 'node.labels.type==db'
+          - 'node.labels.db==true'
       restart_policy:
         condition: on-failure
         max_attempts: 3
@@ -36,15 +38,17 @@ services:
       - source: mysql
         target: /etc/mysql/conf.d/my.cnf
   lilsholex:
-    image: docker.pkg.github.com/sholex-team/lilsholex/lilsholex:latest
+    image: antiwanted/sholex:2.5.3
     networks:
       - db_django
       - django_nginx
     volumes:
       - groupguard:/home/sholex/groupguard/migrations
+      - movie:/home/sholex/movie/migrations
       - persianmeme:/home/sholex/persianmeme/migrations
       - support:/home/sholex/support/migrations
       - anonymous:/home/sholex/anonymous/migrations
+      - number:/home/sholex/number/migrations
     depends_on:
       - db
     secrets:
@@ -55,7 +59,7 @@ services:
         parallelism: 1
         delay: 5s
         order: start-first
-        monitor: 20s
+        monitor: 10s
         failure_action: rollback
       restart_policy:
         max_attempts: 3
@@ -72,10 +76,10 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
-      start_period: 5s
+      start_period: 10s
 
   web:
-    image: docker.pkg.github.com/sholex-team/lilsholex/nginx:latest
+    image: registry.gitlab.com/sholex-team/lilsholex:2.2
     networks:
       - django_nginx
     depends_on:
@@ -88,6 +92,9 @@ services:
         order: start-first
         monitor: 5s
         failure_action: rollback
+      placement:
+        constraints:
+          - 'node.labels.web==true'
       restart_policy:
         max_attempts: 2
         delay: 10s
@@ -113,6 +120,8 @@ networks:
 volumes:
   db:
     name: 'db'
+  movie:
+    name: 'movie'
   groupguard:
     name: 'groupguard'
   persianmeme:
@@ -121,20 +130,10 @@ volumes:
     name: 'anonymous'
   support:
     name: 'support'
+  number:
+    name: 'number'
 secrets:
   db_password:
-    external: true
-  django:
-    external: true
-  anonymous:
-    external: true
-  group:
-    external: true
-  meme:
-    external: true
-  support:
-    external: true
-  admin:
     external: true
 configs:
   nginx:

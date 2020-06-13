@@ -3,7 +3,7 @@ owner = {'keyboard': [
         ['Ban a User'],
         ['Unban a User', 'Full Ban', 'Message User'],
         ['Unchecked Voices', 'Get User'],
-        ['Add Ad', 'Delete Ad']
+        ['Add Ad', 'Delete Ad', 'Delete Requests']
 ], 'resize_keyboard': True}
 user = {'keyboard': [
     ['راهنما 🔰', 'پیشنهاد ویس 🔥'],
@@ -31,11 +31,17 @@ private = {'keyboard': [['حذف 🗑', 'افزودن ⏬'], ['بازگشت 🔙
 
 
 def message(chat_id):
-    return {'inline_keyboard': [[{'text': 'Read', 'callback_data': f'read:{chat_id}'}, {'text': 'Ban', 'callback_data': f'ban:{chat_id}'}], [{'text': 'Reply', 'callback_data': f'reply:{chat_id}'}]]}
+    return {'inline_keyboard': [
+        [{'text': 'Read', 'callback_data': f'read:{chat_id}'},
+         {'text': 'Ban', 'callback_data': f'ban:{chat_id}'}], [{'text': 'Reply', 'callback_data': f'reply:{chat_id}'}]
+    ]}
 
 
-def delete_voice(chat_id):
-    return {'inline_keyboard': [[{'text': 'Delete', 'callback_data': f'delete:{chat_id}'}, {'text': 'Deny', 'callback_data': f'delete_deny:{chat_id}'}]]}
+def delete_voice(delete_id):
+    return {'inline_keyboard': [
+        [{'text': 'Delete', 'callback_data': f'delete:{delete_id}'},
+         {'text': 'Deny', 'callback_data': f'delete_deny:{delete_id}'}]
+    ]}
 
 
 def donate(price):

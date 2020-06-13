@@ -159,6 +159,13 @@ class Group(models.Model):
     def __str__(self):
         return f'{self.chat_id} : {self.status}'
 
+    def save(self, *args, **kwargs):
+        if self.auto_lock and not self.is_checking:
+            from groupguard.tasks import check_lock
+            self.is_checking = True
+            check_lock(self.chat_id)
+        super().save(*args, **kwargs)
+
 
 class Warn(models.Model):
     warn_id = models.AutoField(primary_key=True, verbose_name='Warn ID')
@@ -198,6 +205,7 @@ class Message(models.Model):
     reporters = models.ManyToManyField(User, 'reports_users', verbose_name='Reporters')
     group = models.ForeignKey(Group, models.CASCADE, 'messages_group')
     user = models.ForeignKey(User, models.CASCADE, 'messages_user')
+    date = models.DateTimeField(auto_now_add=True, verbose_name='Creation Date')
 
     class Meta:
         db_table = 'messages'

@@ -40,7 +40,6 @@ class User(models.Model):
     vote = models.BooleanField(verbose_name='Vote System', default=False)
     date = models.DateTimeField(verbose_name='Register Date', auto_now_add=True)
     voice_order = models.CharField(max_length=9, choices=VoiceOrder.choices, default=VoiceOrder.new_voice_id)
-    delete_request = models.BooleanField(default=False, verbose_name='Delete Request')
     private_voices = models.ManyToManyField('Voice', 'private_voices', verbose_name='Private Voices')
     favorite_voices = models.ManyToManyField('Voice', 'favorite_voices', verbose_name='Favorite Voices')
 
@@ -92,3 +91,16 @@ class Ad(models.Model):
 
     def __str__(self):
         return str(self.ad_id)
+
+
+class Delete(models.Model):
+    delete_id = models.AutoField(primary_key=True, verbose_name='Delete ID')
+    voice = models.ForeignKey(Voice, models.CASCADE, 'deletes_voice', verbose_name='Voice')
+    user = models.ForeignKey(User, models.CASCADE, 'deletes_user', verbose_name='User')
+
+    class Meta:
+        db_table = 'persianmeme_deletes'
+        ordering = ['delete_id']
+
+    def __str__(self):
+        return f'{self.delete_id} : {self.voice.voice_id}'

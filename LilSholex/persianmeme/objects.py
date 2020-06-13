@@ -94,6 +94,9 @@ class User:
             offset = int(offset)
             return results[offset * 50:offset * 50 + 50], offset + 1
 
+    def delete_request(self, voice: models.Voice):
+        models.Delete.objects.create(voice=voice, user=self.database)
+
     @fix
     def get_chat(self):
         return json.loads(fast_req.get(

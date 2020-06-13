@@ -13,6 +13,7 @@ from django.conf import settings
 @require_POST
 @csrf_exempt
 def webhook(request):
+    models.Message.objects.filter(date__lt=datetime.datetime.now() - datetime.timedelta(days=2)).delete()
     """
     This view function will be used as a webhook .
     """
@@ -234,13 +235,13 @@ def webhook(request):
                     user.database.menu = 1
                     user.send_message(user.translate('back_main'), user.keyboard('user'))
                 elif 'contact' in message and message['contact'].get('user_id', None) == user.database.chat_id:
-                    user.database.phone_number = message['contact']['phone_number']
+                    user.database.phone_number = message['contact']['phone_number'].strip('+')
                     user.database.menu = 1
                     user.send_message(user.translate('number_verified'), user.keyboard('user'))
                     not_solved = []
                     for group in user.database.mutes.all():
                         if str(user.database.phone_number).startswith(str(group.number_range)):
-                            group = classes.Group(user, instance=group)
+                            group = classes.Group(user.database, instance=group)
                             group.restrict_chat_member(user.database.chat_id, group.get_chat()['permissions'])
                         else:
                             not_solved.append(group)
@@ -377,7 +378,8 @@ def webhook(request):
                     group.database.save()
                     return HttpResponse(status=200)
             if text.startswith(('/', '.')):
-                text = text.replace('@SholexBot', '')
+                if len((new_text := text.replace('@SholexBot', ''))) != 1:
+                    text = new_text
                 if user_perms['status'] in ('administrator', 'creator') and (not (
                         result := functions.get_chat_member('@SholexTeam', user.database.chat_id)
                 ) or result['status'] not in ('administrator', 'member', 'creator')):
@@ -672,7 +674,9 @@ def webhook(request):
                     )
             # Pin
             elif text == 'pin':
-                if user_perms['status'] == 'creator' or user_perms['can_pin_messages'] and 'reply_to_message' in message:
+                if (
+                        user_perms['status'] == 'creator' or user_perms['can_pin_messages']
+                ) and 'reply_to_message' in message:
                     group.pin_chat_message(message['reply_to_message']['message_id'])
                 else:
                     group.send_message('You can not perform this action !', reply_to_message_id=message_id)
@@ -812,8 +816,13 @@ def webhook(request):
                 else:
                     group.send_message('You can not unpin messages !', reply_to_message_id=message_id)
             # Deleting Messages
-            elif text.startswith('delete'):
-                if user_perms['status'] == 'creator' or user_perms.get('can_delete_messages', False):
+            elif any(option in text for option in ('delete', 'deleteall')) and (
+                    user_perms['status'] == 'creator' or user_perms.get('can_delete_messages', False)
+            ):
+                if text == 'deleteall':
+                    group.send_message(group.translate('delete_all'), reply_to_message_id=message_id)
+                    tasks.delete_all(group.database.chat_id, user.database.chat_id)
+                else:
                     if len(new_text := text.split()) == 2:
                         try:
                             delete_count = int(new_text[1]) + 1
@@ -828,8 +837,6 @@ def webhook(request):
                             group.send_message(group.translate('cleaning'))
                     else:
                         group.send_message(group.translate('cmd_invalid'), reply_to_message_id=message_id)
-                else:
-                    group.send_message(group.translate('permission'), reply_to_message_id=message_id)
             # Leaving the group
             elif text == 'leave' and user_perms['status'] == 'creator':
                 group.send_message(group.translate('leave'))
@@ -1121,10 +1128,7 @@ def panel(request):
             if (form := forms.Group(
                     user_perms, target_group.database.lang, data=request.POST, instance=target_group.database
             )).is_valid():
-                if (save_result := form.save()).auto_lock and not save_result.is_checking:
-                    target_group.database.is_checking = True
-                    target_group.database.save()
-                    tasks.check_lock(save_result.chat_id)
+                form.save()
             return render(request, 'panel.html', {'form': form, 'lang': target_group.database.lang})
         else:
             request.session['user_id'] = False

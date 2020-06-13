@@ -88,6 +88,10 @@ commands = {
         'en': 'User [{0}](tg://user?id={1}) has been muted for {2} {3} .',
         'fa': 'کاربر [{0}](tg://user?id={1}) برای {2} {3} میوت شد .'
     },
+    'delete_all': {
+        'en': 'Your group will be cleared as much as possible !',
+        'fa': 'گروه شما تا حد ممکن پاکسازی خواهد شد 🗑'
+    },
     'mute': {
         'en': 'User [{0}](tg://user?id={1}) has been muted .',
         'fa': 'کاربر [{0}](tg://user?id={1}) میوت شد !'
@@ -444,6 +448,10 @@ commands = {
         'en': 'Spamming',
         'fa': 'اسپم کردن'
     },
+    's': {
+        'en': 'seconds',
+        'fa': 'ثانیه'
+    },
     'd': {
         'en': 'days',
         'fa': 'روز'
@@ -455,6 +463,10 @@ commands = {
     'h': {
         'en': 'hours',
         'fa': 'ساعت'
+    },
+    's': {
+        'en': 'seconds',
+        'fa': 'ثانیه'
     },
     'y': {
         'en': 'years',

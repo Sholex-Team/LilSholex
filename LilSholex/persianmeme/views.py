@@ -85,21 +85,18 @@ def webhook(request):
                 voice.delete()
                 functions.answer_callback_query(query_id, 'Voice has been denied ❌', False)
                 user.send_message('ویس ارسالی شما توسط مدیر ربات رد شد ❌')
-        elif callback_data[0] == 'delete':
-            functions.delete_voice(message['voice']['file_unique_id'])
-            user = objects.User(callback_data[1])
-            user.database.delete_request = False
-            functions.answer_callback_query(query_id, 'Voice has been Deleted ✅', True)
+        elif callback_data[0] in ('delete', 'delete_deny'):
+            target_delete = models.Delete.objects.get(delete_id=callback_data[1])
+            user = objects.User(instance=target_delete.user)
+            if callback_data[0] == 'delete':
+                target_delete.voice.delete()
+                functions.answer_callback_query(query_id, 'Voice has been Deleted ✅', True)
+                user.send_message('ویس درخواستی شما از ربات حذف شد ✅')
+            elif callback_data[0] == 'delete_deny':
+                target_delete.delete()
+                functions.answer_callback_query(query_id, 'Delete Request has been denied ☑', True)
+                user.send_message('درخواست حذف ویس شما توسط مدیریت رد شد ❌')
             owner.delete_message(message_id)
-            user.send_message('ویس درخواستی شما از ربات حذف شد ✅')
-            user.database.save()
-        elif callback_data[0] == 'delete_deny':
-            user = objects.User(callback_data[1])
-            user.database.delete_request = False
-            owner.delete_message(message_id)
-            functions.answer_callback_query(query_id, 'Delete Request has been denied ☑', True)
-            user.send_message('درخواست حذف ویس شما توسط مدیریت رد شد ❌')
-            user.database.save()
         else:
             user = objects.User(callback_query['from']['id'])
             user.send_ad()
@@ -201,6 +198,17 @@ def webhook(request):
                 elif text == 'Get User':
                     user.database.menu = 12
                     user.send_message('Please send the user_id .', keyboards.en_back)
+                elif text == 'Delete Requests':
+                    if user.database.rank == 'o':
+                        for delete_request in models.Delete.objects.all():
+                            user.send_voice(
+                                delete_request.voice.file_id,
+                                f'From : {delete_request.user.chat_id}',
+                                keyboards.delete_voice(delete_request.delete_id)
+                            )
+                        user.send_message('Here are delete requests 👆', reply_to_message_id=message_id)
+                    else:
+                        user.send_message('You do not have required permissions !')
                 elif 'voice' in message:
                     search_result = functions.get_voice(message['voice']['file_unique_id'])
                     if search_result.exists():
@@ -397,7 +405,7 @@ def webhook(request):
                     user.database.menu = 7
                     user.send_message('لطفا یکی از روش های مرتب سازی زیر را انتخاب کنید 👇', keyboards.voice_order)
                 elif text == 'درخواست حذف ویس ✖':
-                    if user.database.delete_request:
+                    if user.database.deletes_user.exists():
                         user.send_message('درخواست قبلی شما در حال بررسی است ⚠')
                     else:
                         user.database.menu = 8
@@ -533,15 +541,14 @@ def webhook(request):
                     user.database.menu = 1
                     user.send_message('شما به منوی اصلی بازگشتید 🔙', keyboards.user)
                 else:
-                    if 'voice' in message and functions.get_voice(message['voice']['file_unique_id']).exists():
+                    if 'voice' in message and (target_voice := functions.get_voice(
+                            message['voice']['file_unique_id']
+                    )).exists():
                         owner = objects.User(instance=functions.get_owner())
                         user.database.menu = 1
-                        user.delete_request = True
                         user.send_message('درخواست شما با موفقیت ثبت شد ✅', keyboards.user, message_id)
-                        owner.send_voice(
-                            message['voice']['file_id'], f'Delete Request from : {user.database.chat_id}',
-                            keyboards.delete_voice(user.database.chat_id)
-                        )
+                        user.delete_request(target_voice.first())
+                        owner.send_message('New delete request 🗑')
                     else:
                         user.send_message('لطفا یک ویس ارسال کنید ⚠')
             elif user.database.menu == 10:

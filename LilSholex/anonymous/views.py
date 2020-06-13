@@ -79,7 +79,7 @@ def webhook(request):
                             user.database.menu = 1
                         else:
                             user.send_message('یک نام برای خود تعیین کنید. ✏️\nاین نام برای دیگران قابل نمایش است. 🙊')
-                            user.database.menu = 6
+                            user.database.menu = 8
                             user.database.last_menu = 0
                     else:
                         try:
@@ -204,8 +204,8 @@ def webhook(request):
                     user.database.menu = 1
             elif user.database.menu == 8:
                 if user.database.last_menu == 1:
-                    user.database.menu = 1
                     if text == 'Back':
+                        user.database.menu = 1
                         user.send_message('You are back at the main menu !', keyboards.admin)
                     else:
                         user.database.nick_name = text
@@ -356,12 +356,14 @@ def webhook(request):
                     user.database.menu = 1
                 elif text != 'None':
                     user_receiver = classes.User(token=user.database.token_last_receiver)
-                    models.Message.objects.create(
+                    models.Message.objects.get_or_create(
                         message_id=message_id,
-                        text=text,
-                        sender=user.database,
-                        receiver=user_receiver.database,
-                        message_type='m'
+                        defaults={
+                            'text': text,
+                            'sender': user.database,
+                            'receiver': user_receiver.database,
+                            'message_type': 'm'
+                        }
                     )
                     user_receiver.send_message(f'شما یک پیام جدید از طرف {user.database.nick_name} دریافت کردید !')
                     user.send_message('پیام شما ارسال شد ✅', keyboards.user)
@@ -370,12 +372,16 @@ def webhook(request):
                     user.send_message('شما فقط مجاز به ارسال متن هستید ❌')
             elif user.database.menu == 4:
                 if user.database.last_menu == 1:
-                    user.database.menu = 1
                     if text == 'بازگشت 🔙':
+                        user.database.menu = 1
                         user.send_message('شما به منوی اصلی بازگشتید 🔙', keyboards.user)
                     else:
-                        user.database.nick_name = text
-                        user.send_message('نام کاربری شما تنظیم شد ☑️🔙', keyboards.user)
+                        if len(text) <= 64:
+                            user.database.nick_name = text
+                            user.database.menu = 1
+                            user.send_message('نام کاربری شما تنظیم شد ☑️🔙', keyboards.user)
+                        else:
+                            user.send_message('نام کاربری بیش از حد طولانی است !')
                 elif user.database.last_menu == 3:
                     user.send_message('اکنون پیام خود را ارسال کنید ✔️', keyboards.fa_back)
                     user.database.nick_name = text

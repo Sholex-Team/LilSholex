@@ -3,7 +3,7 @@ from groupguard import models, classes
 from groupguard.functions import tehran_time
 from groupguard.decorators import fix
 from django.conf import settings
-from datetime import datetime
+import datetime
 import requests
 
 
@@ -43,7 +43,7 @@ def check_lock(group_id):
     group = classes.Group(instance=models.Group.objects.filter(chat_id=group_id).first())
     if group.database.auto_lock:
         if group.database.auto_lock_off > (
-                current_time := tehran_time(datetime.now()).time()
+                current_time := tehran_time(datetime.datetime.now()).time()
         ) >= group.database.auto_lock_on and not group.database.last_permissions:
             group.lockdown()
             group.database.save()
@@ -56,3 +56,14 @@ def check_lock(group_id):
     else:
         group.database.is_checking = False
         group.database.save()
+
+
+@background(schedule=5)
+def delete_all(group_id, user_id):
+    group = classes.Group(models.User.objects.get(chat_id=user_id), group_id)
+    for message in (all_messages := group.database.messages_group.all()).filter(
+            date__gte=datetime.datetime.now() - datetime.timedelta(days=2)
+    ):
+        group.delete_message(message.message_unique_id)
+    all_messages.delete()
+    group.send_message(group.translate('cleaning'))
