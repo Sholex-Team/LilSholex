@@ -174,3 +174,41 @@ def inlinePanel(chat_id, from_id):
              {'text': group.database.inline_keyboard_lock, 'callback_data': f'change_inline_keyboard_lock|{chat_id}'}]
         ]}
     }
+
+def managePanel(chat_id, reply_id):
+    user = classes.User(reply_id)
+    group = classes.Group(user.database, chat_id)
+    muted_text = {'en': 'Mute',
+                  'fa': 'بی صدا'}
+    if not group.get_chat_member(
+        reply_id
+    ).get('can_send_messages', None):
+        muted_text = {'en': 'Unmute',
+                      'fa': 'با صدا'}
+    return {'en': {'inline_keyboard': [
+        [{'text': 'Warn count(s)', 'callback_data': 'none'},
+         {'text': group.get_warns(user.database).count, 'callback_data': 'none'}],
+
+        [{'text': 'Add warn', 'callback_data': 'AddwarnU|'+str(reply_id)}],
+
+        [{'text': 'Delete all warns', 'callback_data': 'DeleteallwarnsU|'+str(reply_id)}],
+
+        [{'text': 'Ban', 'callback_data': 'BanU|'+str(reply_id)},
+         {'text': 'Unban', 'callback_data': 'UnbanU|'+str(reply_id)}],
+
+        [{'text': muted_text['en'], 'callback_data': '{}U|{}'.format(muted_text['en'], reply_id)}]
+    ]},
+        'fa': {'inline_keyboard': [
+            [{'text': 'تعداد اخطار ها', 'callback_data': 'none'},
+             {'text': group.get_warns(user.database).count, 'callback_data': 'none'}],
+
+            [{'text': 'اخطار', 'callback_data': 'AddwarnU|' + str(reply_id)}],
+
+            [{'text': 'پاکسازی اخطار ها', 'callback_data': 'DeleteallwarnsU|' + str(reply_id)}],
+
+            [{'text': 'بن', 'callback_data': 'BanU|' + str(reply_id)},
+             {'text': 'آن بن', 'callback_data': 'UnbanU|' + str(reply_id)}],
+
+            [{'text': muted_text['fa'], 'callback_data': '{}U|{}'.format(muted_text['en'], reply_id)}]
+        ]}
+}
