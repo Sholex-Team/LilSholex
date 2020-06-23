@@ -40,7 +40,7 @@ def webhook(request):
             user = classes.User(update['callback_query']['from']['id'])
             group = classes.Group(user.database, chat_id)
             user_perms = group.get_chat_member(user.database.chat_id)
-            if user_perms['status'] in ('administrator', 'creator'):
+            if user_perms['status'] in ('administrator', 'creator') or user_perms['can_restrict_members']:
                 getattr(group.database, lockType)
                 setattr(group.database, lockType, True)
                 keyboard = keyboards.inlinePanel(chat_id, update['callback_query']['from']['id'])
@@ -323,7 +323,7 @@ def webhook(request):
                 group.database.save()
                 user.database.save()
                 return HttpResponse(status=200)
-
+        user_perms = group.get_chat_member(user.database.chat_id)
         # Welcome message for non bot users
         if group.database.is_welcome_message and 'new_chat_members' in message:
             text_is_cmd = False
@@ -1077,7 +1077,7 @@ def webhook(request):
                         raise classes.Violation(group.translate('poll_lock'))
                     elif group.database.game_lock and 'game' in message:
                         raise classes.Violation(group.translate('game_lock'))
-                    elif group.database.inline_keyboard_lockinline_keyboard_lock and 'reply_markup' in message:
+                    elif group.database.inline_keyboard_lock and 'reply_markup' in message:
                         raise classes.Violation(group.translate('inline'))
                     elif group.database.text_lock and text:
                         raise classes.Violation(group.translate('text_lock'))
