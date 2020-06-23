@@ -50,6 +50,7 @@ def webhook(request):
                 else:
                     keyboard = keyboard['en']
                     answer = 'Done !'
+                functions.answer_callback_query(callback_id, answer, True)
                 user.edit_message_keyboard(update['callback_query']['from']['id'], message_id, keyboard)
 
         return HttpResponse(status=200)
