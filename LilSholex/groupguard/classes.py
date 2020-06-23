@@ -34,12 +34,22 @@ class User:
             reply_markup = json.dumps(reply_markup)
         encoded = urlencode({'text': text, 'reply_markup': reply_markup})
         if (result := json.loads(fast_req.get(
-            f'https://api.telegram.org/bot{settings.GROUP}/sendMessage?chat_id={self.database.chat_id}&{encoded}&'
-            f'reply_to_message_id={reply_to_message_id}&parse_mode={parse_mode}&'
-            f'disable_web_page_preview={disable_web_page_preview}'
+                f'https://api.telegram.org/bot{settings.GROUP}/sendMessage?chat_id={self.database.chat_id}&{encoded}&'
+                f'reply_to_message_id={reply_to_message_id}&parse_mode={parse_mode}&'
+                f'disable_web_page_preview={disable_web_page_preview}'
         )['body']))['ok']:
             return result['result']['message_id']
         return 0
+
+    def call(self, method, **kwargs):
+        data = kwargs
+        u = f"https://api.telegram.org/bot{settings.GROUP}/{method}"
+        res = fast_req.post(u, data=data)
+        data = res.text
+        return data
+    @fix
+    def edit_message_keyboard(self,chat_id, message_id, reply_markup=None):
+        self.call('editMessageReplyMarkup', chat_id=chat_id, message_id=message_id, reply_markup=reply_markup)
 
     @fix
     def get_chat(self) -> dict:
@@ -175,6 +185,7 @@ class Group(User):  # Using User class Methods in Group class
         )['body']))['ok']:
             return result['result']
         return ()
+
 
     def get_warns(self, user: models.User):
         warn, created = models.Warn.objects.get_or_create(user=user, group=self.database)
