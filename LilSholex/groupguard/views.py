@@ -39,17 +39,18 @@ def webhook(request):
             lockType = search('^change_(.*)_lock\S(-.*)', data).group(1) + '_lock'
             user = classes.User(update['callback_query']['from']['id'])
             group = classes.Group(user.database, chat_id)
-            getattr(group.database, lockType)
-            setattr(group.database, lockType, True)
-
-            keyboard = keyboards.inlinePanel(chat_id, update['callback_query']['from']['id'])
-            if user.database.lang == 'fa':
-                keyboard = keyboard['fa']
-                answer = 'انجام شد !'
-            else:
-                keyboard = keyboard['en']
-                answer = 'Done !'
-            user.edit_message_keyboard(update['callback_query']['from']['id'], message_id, keyboard)
+            user_perms = group.get_chat_member(user.database.chat_id)
+            if user_perms['status'] in ('administrator', 'creator'):
+                getattr(group.database, lockType)
+                setattr(group.database, lockType, True)
+                keyboard = keyboards.inlinePanel(chat_id, update['callback_query']['from']['id'])
+                if user.database.lang == 'fa':
+                    keyboard = keyboard['fa']
+                    answer = 'انجام شد !'
+                else:
+                    keyboard = keyboard['en']
+                    answer = 'Done !'
+                user.edit_message_keyboard(update['callback_query']['from']['id'], message_id, keyboard)
 
         return HttpResponse(status=200)
     elif 'message' in update:
@@ -322,7 +323,7 @@ def webhook(request):
                 group.database.save()
                 user.database.save()
                 return HttpResponse(status=200)
-        user_perms = group.get_chat_member(user.database.chat_id)
+
         # Welcome message for non bot users
         if group.database.is_welcome_message and 'new_chat_members' in message:
             text_is_cmd = False
