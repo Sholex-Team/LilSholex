@@ -7,6 +7,10 @@ commands = {
         'en': 'Panel',
         'fa': 'پنل'
     },
+    'manage_user': {
+        'en': 'Manage user',
+        'fa': 'مدیریت کاربر'
+    },
     'lang_not_found': {
         'en': 'Can not change language to {0}. ✖',
         'fa': 'زبان را نمیتوان به {0} تغییر داد. ✖'
