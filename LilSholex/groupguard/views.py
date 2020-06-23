@@ -40,7 +40,7 @@ def webhook(request):
             user = classes.User(update['callback_query']['from']['id'])
             group = classes.Group(user.database, chat_id)
             user_perms = group.get_chat_member(user.database.chat_id)
-            if user_perms['status'] in ('administrator', 'creator') and user_perms['can_restrict_members']:
+            if user_perms['status'] in ('administrator', 'creator') or user_perms['can_restrict_members']:
                 getattr(group.database, lockType)
                 setattr(group.database, lockType, True)
                 keyboard = keyboards.inlinePanel(chat_id, update['callback_query']['from']['id'])
@@ -52,7 +52,77 @@ def webhook(request):
                     answer = 'Done !'
                 functions.answer_callback_query(callback_id, answer, True)
                 user.edit_message_keyboard(update['callback_query']['from']['id'], message_id, keyboard)
-
+        elif search('^(\S+)U\S([0-9]+)$', data):
+            user_id = search('^(\S+)U\S([0-9]+)$', data).group(2)
+            command = search('^(\S+)U\S([0-9]+)$', data).group(1)
+            user = classes.User(update['callback_query']['from']['id'])
+            group = classes.Group(user.database, update['callback_query']['message']['chat']['id'])
+            user_perms = group.get_chat_member(user.database.chat_id)
+            if user_perms['status'] in ('administrator', 'creator') or user_perms['can_restrict_members']:
+                if command in (
+                    'Addwarn',
+                    'Deleteallwarns',
+                    'Ban',
+                    'Unban',
+                    'Unmute',
+                    'Mute'
+                ):
+                    if command == 'Addwarn':
+                        if group.get_chat_member(
+                                user_id
+                        )['status'] not in ('creator', 'administrator'):
+                            group.warn_user(
+                                classes.User(user_id),
+                                group.translate('admin_cmd')
+                            )
+                        else:
+                            group.send_message(
+                                group.translate('admin_user'), reply_to_message_id=message_id
+                            )
+                    elif command == 'Deleteallwarns':
+                        group.clear(group.get_chat_member(user_id))
+                    elif command == 'Ban':
+                        if group.get_chat_member(
+                                user_id
+                        )['status'] not in ('creator', 'administrator'):
+                            group.kick_chat_member(
+                                user_id,
+                                group.get_chat_member(user_id)['first_name'],
+                                group.translate('admin_cmd')
+                            )
+                        else:
+                            group.send_message(
+                                group.translate('admin_user'), reply_to_message_id=message_id
+                            )
+                    elif command == 'Unban':
+                        group.unban_chat_member(group.get_chat_member(user_id))
+                    elif command == 'Mute':
+                        if group.get_chat_member(
+                                user_id
+                        )['status'] not in ('creator', 'administrator'):
+                            group.restrict_chat_member(
+                                user_id,
+                                {'can_send_messages': False}
+                            )
+                        else:
+                            group.send_message(
+                                group.translate('admin_user'), reply_to_message_id=message_id
+                            )
+                    elif command == 'Unmute':
+                        if not group.get_chat_member(
+                                user_id
+                        ).get('can_send_messages', None):
+                            group.restrict_chat_member(
+                                user_id,
+                                group.get_chat()['permissions']
+                            )
+                            group.send_message(group.translate(
+                                'unmute',
+                                group.get_chat_member(user_id)['first_name'],
+                                user_id
+                            ), parse_mode='Markdown')
+                        else:
+                            group.send_message(group.translate('unmuted'), reply_to_message_id=message_id)
         return HttpResponse(status=200)
     elif 'message' in update:
         message = update['message']
@@ -949,6 +1019,26 @@ def webhook(request):
                     keyboard
                 )
                 group.send_message(group.translate('panel_sent'), reply_to_message_id=message_id)
+            elif text == 'manage':
+                if group.get_chat_member(
+                        message['reply_to_message']['from']['id']
+                )['status'] not in ('creator', 'administrator'):
+
+                    keyboard = keyboards.managePanel(message['chat']['id'], message['reply_to_message']['from']['id'])
+                    if group.database.lang == 'fa':
+                        keyboard = keyboard['fa']
+                    else:
+                        keyboard = keyboard['en']
+                    group.send_message(
+                        group.translate('manage_user'),
+                        keyboard,
+                        reply_to_message_id=message_id,
+                    )
+
+                else:
+                    group.send_message(
+                        group.translate('admin_user'), reply_to_message_id=message_id
+                    )
             else:
                 try:
                     command = models.Command.objects.get(
