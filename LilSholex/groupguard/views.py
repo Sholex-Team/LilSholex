@@ -8,6 +8,7 @@ from string import ascii_letters
 from ipware import get_client_ip
 import datetime
 from django.conf import settings
+from re import search
 
 
 @require_POST
@@ -23,6 +24,7 @@ def webhook(request):
         group = classes.Group(instance=validation.group)
         message_id = update['callback_query']['message']['message_id']
         callback_id = update['callback_query']['id']
+        data = update['callback_query']['data']
         if validation.validated or validation.valid_until < datetime.datetime.now():
             group.delete_message(message_id)
             functions.answer_callback_query(callback_id, group.translate('expired'), True)
@@ -32,6 +34,25 @@ def webhook(request):
             group.delete_message(message_id)
             group.restrict_chat_member(user_id, group.get_chat()['permissions'])
             validation.save()
+        if search('^change_(.*)_lock\S(-.*)', data):
+            chat_id = search('^change_(.*)_lock\S(-.*)', data).group(2)
+            lockType = search('^change_(.*)_lock\S(-.*)', data).group(1) + '_lock'
+            user = classes.User(update['callback_query']['from']['id'])
+            group = classes.Group(user.database, chat_id)
+            user_perms = group.get_chat_member(user.database.chat_id)
+            if user_perms['status'] in ('administrator', 'creator') and user_perms['can_restrict_members']:
+                getattr(group.database, lockType)
+                setattr(group.database, lockType, True)
+                keyboard = keyboards.inlinePanel(chat_id, update['callback_query']['from']['id'])
+                if user.database.lang == 'fa':
+                    keyboard = keyboard['fa']
+                    answer = 'انجام شد !'
+                else:
+                    keyboard = keyboard['en']
+                    answer = 'Done !'
+                functions.answer_callback_query(callback_id, answer, True)
+                user.edit_message_keyboard(update['callback_query']['from']['id'], message_id, keyboard)
+
         return HttpResponse(status=200)
     elif 'message' in update:
         message = update['message']
@@ -917,6 +938,17 @@ def webhook(request):
                     }]]}
                 )
                 group.send_message(group.translate('login_sent'), user.keyboard('login'), message_id)
+            elif text == 'panel':
+                keyboard = keyboards.inlinePanel(message['chat']['id'], message['from']['id'])
+                if user.database.lang == 'fa':
+                    keyboard = keyboard['fa']
+                else:
+                    keyboard = keyboard['en']
+                user.send_message(
+                    group.translate('inline_panel'),
+                    keyboard
+                )
+                group.send_message(group.translate('panel_sent'), reply_to_message_id=message_id)
             else:
                 try:
                     command = models.Command.objects.get(

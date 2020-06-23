@@ -3,6 +3,10 @@ commands = {
         'en': 'Bot language changed to English ✅',
         'fa': 'زبان به فارسی تغییر کرد ✅'
     },
+    'inline_panel': {
+        'en': 'Panel',
+        'fa': 'پنل'
+    },
     'lang_not_found': {
         'en': 'Can not change language to {0}. ✖',
         'fa': 'زبان را نمیتوان به {0} تغییر داد. ✖'
@@ -283,6 +287,10 @@ commands = {
     'login_sent': {
         'en': 'Login Link has been sent to your private chat ☑️',
         'fa': 'لینک ورود در چت خصوصی شما ارسال شد ☑️'
+    },
+    'panel_sent': {
+        'en': 'Inline panel has been sent to your private chat ☑️',
+        'fa': 'پنل شیشه ای در چت خصوصی شما ارسال شد ☑️'
     },
     'cleaning': {
         'en': 'Cleaning is done 🧹',
