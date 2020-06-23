@@ -26,7 +26,7 @@ class User(models.Model):
         english = 'en', 'English'
 
     chat_id = models.BigIntegerField(primary_key=True, verbose_name='Chat ID')
-    username = models.CharField(max_length=64, verbose_name='Username', null=True, blank=True)
+    username = models.CharField(max_length=35, verbose_name='Username', null=True, blank=True)
     menu = models.IntegerField(verbose_name='Current Menu', default=1)
     status = models.CharField(max_length=1, verbose_name='User Status', choices=Status.choices, default=Status.active)
     rank = models.CharField(max_length=1, choices=Rank.choices, default=Rank.user, verbose_name='User Rank')
