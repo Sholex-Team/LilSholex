@@ -40,7 +40,7 @@ def webhook(request):
             user = classes.User(update['callback_query']['from']['id'])
             group = classes.Group(user.database, chat_id)
             user_perms = group.get_chat_member(user.database.chat_id)
-            if user_perms['status'] in ('administrator', 'creator') or user_perms['can_restrict_members']:
+            if user_perms['status'] in ('administrator', 'creator') and user_perms['can_restrict_members']:
                 getattr(group.database, lockType)
                 setattr(group.database, lockType, True)
                 keyboard = keyboards.inlinePanel(chat_id, update['callback_query']['from']['id'])
