@@ -7,6 +7,14 @@ commands = {
         'en': 'Panel',
         'fa': 'پنل'
     },
+    'manage_user': {
+        'en': 'Manage user',
+        'fa': 'مدیریت کاربر'
+    },
+    'manage_panel_mute_text': {
+      'en': {'T': 'Mute', 'F': 'Unmute'},
+      'fa': {'T': 'با صدا', 'F': 'بی صدا'}
+    },
     'lang_not_found': {
         'en': 'Can not change language to {0}. ✖',
         'fa': 'زبان را نمیتوان به {0} تغییر داد. ✖'
