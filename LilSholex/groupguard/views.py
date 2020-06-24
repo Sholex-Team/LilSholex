@@ -34,16 +34,16 @@ def webhook(request):
             group.delete_message(message_id)
             group.restrict_chat_member(user_id, group.get_chat()['permissions'])
             validation.save()
+        user = classes.User(update['callback_query']['from']['id'])
+        group = classes.Group(user.database, update['callback_query']['message']['chat']['id'])
+        user_perms = group.get_chat_member(user.database.chat_id)
         if search('^change_(.*)_lock\S(-.*)', data):
             chat_id = search('^change_(.*)_lock\S(-.*)', data).group(2)
             lockType = search('^change_(.*)_lock\S(-.*)', data).group(1) + '_lock'
-            user = classes.User(update['callback_query']['from']['id'])
-            group = classes.Group(user.database, chat_id)
-            user_perms = group.get_chat_member(user.database.chat_id)
             if user_perms['status'] in ('administrator', 'creator') and user_perms['can_restrict_members']:
                 getattr(group.database, lockType)
                 setattr(group.database, lockType, True)
-                keyboard = keyboards.inlinePanel(chat_id, update['callback_query']['from']['id'])
+                keyboard = keyboards.inline_panel(chat_id, update['callback_query']['from']['id'], user, group)
                 if user.database.lang == 'fa':
                     keyboard = keyboard['fa']
                     answer = 'انجام شد !'
@@ -55,9 +55,6 @@ def webhook(request):
         elif search('^(\S+)U\S([0-9]+)$', data):
             user_id = search('^(\S+)U\S([0-9]+)$', data).group(2)
             command = search('^(\S+)U\S([0-9]+)$', data).group(1)
-            user = classes.User(update['callback_query']['from']['id'])
-            group = classes.Group(user.database, update['callback_query']['message']['chat']['id'])
-            user_perms = group.get_chat_member(user.database.chat_id)
             if user_perms['status'] in ('administrator', 'creator') and user_perms['can_restrict_members']:
                 if command in (
                     'Addwarn',
@@ -1009,7 +1006,7 @@ def webhook(request):
                 )
                 group.send_message(group.translate('login_sent'), user.keyboard('login'), message_id)
             elif text == 'panel':
-                keyboard = keyboards.inlinePanel(message['chat']['id'], message['from']['id'])
+                keyboard = keyboards.inlinePanel(message['chat']['id'], message['from']['id'], user, group)
                 if user.database.lang == 'fa':
                     keyboard = keyboard['fa']
                 else:
@@ -1024,7 +1021,7 @@ def webhook(request):
                         message['reply_to_message']['from']['id']
                 )['status'] not in ('creator', 'administrator'):
 
-                    keyboard = keyboards.managePanel(message['chat']['id'], message['reply_to_message']['from']['id'])
+                    keyboard = keyboards.manage_panel(message['chat']['id'], message['reply_to_message']['from']['id'], user, group)
                     if group.database.lang == 'fa':
                         keyboard = keyboard['fa']
                     else:
