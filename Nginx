@@ -1,4 +1,0 @@
-FROM nginx:1.19.0
-# Adding Files
-WORKDIR /home/LilSholex
-ADD LilSholex/static static

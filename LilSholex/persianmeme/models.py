@@ -1,4 +1,13 @@
+import json
+from urllib.parse import urlencode
+
+from aiohttp import ClientSession
+from django.conf import settings
 from django.db import models
+from asgiref.sync import sync_to_async
+
+from LilSholex.decorators import fix
+from .keyboards import voice as voice_keyboard
 
 
 class User(models.Model):
@@ -11,12 +20,12 @@ class User(models.Model):
         owner = 'o', 'Owner'
         user = 'u', 'User'
         admin = 'a', 'Admin'
-        semi_admin = 's', 'Semi Admin'
+        khiar = 'k', 'Khiar'
 
     class VoiceOrder(models.TextChoices):
         votes = 'votes', 'Votes (Low to High)'
         voice_id = 'voice_id', 'Voice ID (Old to New)'
-        high_votes = '-vote', 'Votes (High to Low)'
+        high_votes = '-votes', 'Votes (High to Low)'
         new_voice_id = '-voice_id', 'Voice ID (New to Old)'
 
     user_id = models.AutoField(verbose_name='User ID', primary_key=True, unique=True)
@@ -30,9 +39,9 @@ class User(models.Model):
     )
     rank = models.CharField(max_length=1, choices=Rank.choices, default=Rank.user, verbose_name='User Rank')
     sent_message = models.BooleanField(verbose_name='Sent Message', default=False)
-    username = models.CharField(max_length=255, verbose_name='Username', null=True, blank=True)
+    username = models.CharField(max_length=35, verbose_name='Username', null=True, blank=True)
     sent_voice = models.BooleanField(verbose_name='Sent Voice', default=False)
-    temp_voice_name = models.CharField(max_length=200, null=True)
+    temp_voice_name = models.CharField(max_length=50, null=True)
     temp_user_id = models.BigIntegerField(null=True)
     last_date = models.BigIntegerField()
     count = models.IntegerField(default=1)
@@ -61,6 +70,7 @@ class Voice(models.Model):
         private = 'p', 'Private'
 
     voice_id = models.AutoField(verbose_name='Voice ID', unique=True, primary_key=True)
+    message_id = models.BigIntegerField(verbose_name='Message ID', null=True, blank=True)
     file_id = models.CharField(max_length=200, verbose_name='Voice File ID')
     file_unique_id = models.CharField(max_length=100, verbose_name='Voice Unique ID')
     name = models.CharField(max_length=200, verbose_name='Voice Name')
@@ -70,6 +80,8 @@ class Voice(models.Model):
     status = models.CharField(max_length=1, choices=Status.choices, verbose_name='Voice Status')
     date = models.DateTimeField(auto_now_add=True, verbose_name='Register Date')
     voice_type = models.CharField(max_length=1, choices=Type.choices, default=Type.normal, verbose_name='Voice Type')
+    accept_vote = models.ManyToManyField(User, 'accept_vote_users', blank=True, verbose_name='Accept Votes')
+    deny_vote = models.ManyToManyField(User, 'deny_vote_users', blank=True, verbose_name='Deny Votes')
 
     class Meta:
         db_table = 'persianmeme_voices'
@@ -77,6 +89,74 @@ class Voice(models.Model):
 
     def __str__(self):
         return f'{self.name}:{self.file_id}'
+
+    def accept(self):
+        from .functions import send_message
+        self.status = 'a'
+        self.save()
+        self.sender.sent_voice = False
+        self.sender.save()
+        send_message(self.sender.chat_id, 'ویس ارسالی شما توسط مدیر ربات تایید شد ✅')
+
+    def deny(self):
+        from .functions import send_message
+        self.sender.sent_voice = False
+        self.sender.save()
+        send_message(self.sender.chat_id, 'ویس ارسالی شما توسط مدیر ربات رد شد ❌')
+        self.delete()
+
+    @sync_to_async
+    def get_sender(self):
+        return self.sender
+
+    @sync_to_async
+    def get_voters_admin(self):
+        return list(self.accept_vote.all()), list(self.deny_vote.all())
+
+    @sync_to_async
+    def get_voters(self):
+        return list(self.voters.all())
+
+    async def edit_vote_count(self, message_id: int, session: ClientSession):
+        accept_votes, deny_votes = await self.get_voters_admin()
+        accept_voters = '\n\t'.join(
+            [f'<a href="tg://user?id={user.chat_id}">{user.chat_id}</a>' for user in accept_votes]
+        )
+        deny_voters = '\n\t'.join(
+            [f'<a href="tg://user?id={user.chat_id}">{user.chat_id}</a>' for user in deny_votes]
+        )
+        caption = (
+            f'<b>Sender</b>: {(await self.get_sender()).chat_id}\n'
+            f'<b>Voice Info</b>: {self.name}\n\n'
+            f'<b>Accept Voters</b>:\n\t{accept_voters}\n\n'
+            f'<b>Deny Voters</b>:\n\t{deny_voters}'
+        )
+        encoded = urlencode({
+            'caption': caption,
+            'parse_mode': 'Html',
+            'reply_markup': json.dumps(voice_keyboard(len(accept_votes), len(deny_votes)))
+        })
+        async with session.get(
+                f'https://api.telegram.org/bot{settings.MEME}/editMessageCaption?chat_id={settings.MEME_CHANNEL}&'
+                f'message_id={message_id}&{encoded}'
+        ) as _:
+            pass
+
+    @fix
+    async def send_voice(self, session: ClientSession) -> int:
+        encoded = urlencode({
+            'caption': f'<b>Sender</b>: {self.sender.chat_id}\n<b>Voice Info</b>: {self.name}',
+            'parse_mode': 'Html',
+            'reply_markup': json.dumps(voice_keyboard())
+        })
+        async with session.get(
+                f'https://api.telegram.org/bot{settings.MEME}/sendVoice?chat_id={settings.MEME_CHANNEL}&'
+                f'voice={self.file_id}&{encoded}'
+        ) as response:
+            response = await response.json()
+            if response['ok']:
+                return response['result']['message_id']
+            return 0
 
 
 class Ad(models.Model):
@@ -104,3 +184,11 @@ class Delete(models.Model):
 
     def __str__(self):
         return f'{self.delete_id} : {self.voice.voice_id}'
+
+    @sync_to_async
+    def get_voice(self):
+        return self.voice
+
+    @sync_to_async
+    def get_user(self):
+        return self.user

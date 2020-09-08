@@ -1,27 +1,24 @@
-import os
-import sentry_sdk
-from sentry_sdk.integrations.django import DjangoIntegration
-# Build paths inside the project like this: os.path.join(BASE_DIR, ...)
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from pathlib import Path
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
 # Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
+# See https://docs.djangoproject.com/en/3.1/howto/deployment/checklist/
+
 # SECURITY WARNING: keep the secret key used in production secret!
-with open('/run/secrets/admin') as admin_secret:
-    ADMIN = admin_secret.read()
-with open('/run/secrets/django') as django_secret:
-    SECRET_KEY = django_secret.read()
-with open('/run/secrets/group') as group_secret:
-    GROUP = group_secret.read()
-with open('/run/secrets/meme') as meme_secret:
-    MEME = meme_secret.read()
-with open('/run/secrets/support') as support_secret:
-    SUPPORT = support_secret.read()
-with open('/run/secrets/anonymous') as anonymous_secret:
-    ANONYMOUS = anonymous_secret.read()
+with open('/run/secrets/secret') as secret_file:
+    SECRET_KEY = secret_file.read()
+with open('/run/secrets/meme') as meme_file:
+    MEME = meme_file.read()
+with open('/run/secrets/meme_channel') as meme_channel:
+    MEME_CHANNEL = meme_channel.read()
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
-ALLOWED_HOSTS = ['lilsholex']
+ALLOWED_HOSTS = ['lilsholex', 'localhost']
 # Application definition
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -30,16 +27,13 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'background_task',
-    'groupguard.apps.GroupguardConfig',
-    'support.apps.SupportConfig',
-    'persianmeme.apps.PersianmemeConfig',
-    'anonymous.apps.AnonymousConfig'
+    'persianmeme.apps.PersianmemeConfig'
 ]
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -50,7 +44,7 @@ ROOT_URLCONF = 'LilSholex.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates')],
+        'DIRS': [BASE_DIR.joinpath('templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -67,22 +61,21 @@ WSGI_APPLICATION = 'LilSholex.wsgi.application'
 
 
 # Database
-# https://docs.djangoproject.com/en/3.0/ref/settings/#databases
-with open('/run/secrets/db_password', 'r') as secret:
+# https://docs.djangoproject.com/en/3.1/ref/settings/#databases
+with open('/run/secrets/db_password') as secret:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
             'NAME': 'sholex',
-            'USER': 'root',
+            'USER': 'django',
             'PASSWORD': secret.read(),
             'HOST': 'db',
-            'PORT': 3306
+            'PORT': 3306,
+            'OPTIONS': {'charset': 'utf8mb4'}
         }
     }
-
-
 # Password validation
-# https://docs.djangoproject.com/en/3.0/ref/settings/#auth-password-validators
+# https://docs.djangoproject.com/en/3.1/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -101,7 +94,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 # Internationalization
-# https://docs.djangoproject.com/en/3.0/topics/i18n/
+# https://docs.djangoproject.com/en/3.1/topics/i18n/
 
 LANGUAGE_CODE = 'en-us'
 
@@ -113,14 +106,12 @@ USE_L10N = True
 
 USE_TZ = False
 
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
-sentry_sdk.init(
-    dsn='<TOKEN>',
-    integrations=[DjangoIntegration()],
-    send_default_pii=True
-)
-DATES = {'h': 'hours', 'd': 'days', 'y': 'years', 'm': 'minutes', 's': 'seconds'}
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/3.1/howto/static-files/
+
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR.joinpath(BASE_DIR, 'static')
 MAX_ATTEMPTS = 2
-BACKGROUND_TASK_RUN_ASYNC = False
+BACKGROUND_TASK_RUN_ASYNC = True
+BACKGROUND_TASK_ASYNC_THREADS = 4

@@ -1,9 +1,9 @@
 owner = {'keyboard': [
-        ['Add Sound', 'Delete Sound', 'Voice Count', 'Member Count'],
-        ['Ban a User'],
-        ['Unban a User', 'Full Ban', 'Message User'],
-        ['Unchecked Voices', 'Get User'],
-        ['Add Ad', 'Delete Ad', 'Delete Requests']
+    ['Add Sound', 'Delete Sound', 'Voice Count', 'Member Count'],
+    ['Ban a User'],
+    ['Unban a User', 'Full Ban', 'Message User'],
+    ['Get User'],
+    ['Add Ad', 'Delete Ad', 'Delete Requests']
 ], 'resize_keyboard': True}
 user = {'keyboard': [
     ['راهنما 🔰', 'پیشنهاد ویس 🔥'],
@@ -16,10 +16,6 @@ user = {'keyboard': [
 ], 'resize_keyboard': True}
 per_back = {'keyboard': [['بازگشت 🔙']], 'resize_keyboard': True}
 en_back = {'keyboard': [['Back 🔙']], 'resize_keyboard': True}
-voice = {'inline_keyboard': [[
-    {'text': 'Accept', 'callback_data': 'accept'},
-    {'text': 'Deny', 'callback_data': 'deny'}
-]]}
 toggle = {'keyboard': [['روشن 🔛', 'خاموش 🔴'], ['بازگشت 🔙']], 'resize_keyboard': True}
 voice_order = {'keyboard': [
     ['قدیم به جدید', 'جدید به قدیم'],
@@ -30,10 +26,20 @@ next_page = {'keyboard': [['صفحه ی بعد ➡️'], ['بازگشت 🔙']],
 private = {'keyboard': [['حذف 🗑', 'افزودن ⏬'], ['بازگشت 🔙']], 'resize_keyboard': True}
 
 
+def voice(accept_count: int = 0, deny_count: int = 0):
+    return {'inline_keyboard': [[
+        {'text': f'Accept : {accept_count} ', 'callback_data': 'accept'},
+        {'text': f'Deny : {deny_count}', 'callback_data': 'deny'}
+    ]]}
+
+
 def message(chat_id):
     return {'inline_keyboard': [
-        [{'text': 'Read', 'callback_data': f'read:{chat_id}'},
-         {'text': 'Ban', 'callback_data': f'ban:{chat_id}'}], [{'text': 'Reply', 'callback_data': f'reply:{chat_id}'}]
+        [
+            {'text': 'Read', 'callback_data': f'read:{chat_id}'},
+            {'text': 'Ban', 'callback_data': f'ban:{chat_id}'}
+        ],
+        [{'text': 'Reply', 'callback_data': f'reply:{chat_id}'}]
     ]}
 
 

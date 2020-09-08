@@ -2,6 +2,7 @@ from django.contrib import admin
 from persianmeme import models
 from django.http import HttpResponse
 from django.core.serializers import serialize
+from persianmeme.functions import delete_vote
 
 
 def export_json(costume_admin, request, queryset):
@@ -9,24 +10,27 @@ def export_json(costume_admin, request, queryset):
 
 
 def ban_user(costume_admin, request, queryset):
-    result = queryset.update(status='b')
-    if result == 1:
+    if (result := queryset.update(status='b')) == 0:
+        costume_admin.message_user(request, 'There is no need to banned these users !')
+    elif result == 1:
         costume_admin.message_user(request, '1 User has been banned !')
     else:
         costume_admin.message_user(request, f'{result} Users have been banned !')
 
 
 def full_ban(costume_admin, request, queryset):
-    result = queryset.update(status='f')
-    if result == 1:
+    if (result := queryset.update(status='f')) == 0:
+        costume_admin.message_user(request, 'There is no need to full banned these users !')
+    elif result == 1:
         costume_admin.message_user(request, '1 User has been full banned !')
     else:
         costume_admin.message_user(request, f'{result} Users have been banned !')
 
 
 def unban_user(costume_admin, request, queryset):
-    result = queryset.update(status='a')
-    if result == 1:
+    if (result := queryset.update(status='a')) == 0:
+        costume_admin.message_user(request, 'There is no need to unbanned these users !')
+    elif result == 1:
         costume_admin.message_user(request, '1 User has been unbanned .')
     else:
         costume_admin.message_user(request, f'{result} Users have been unbanned .')
@@ -58,12 +62,8 @@ class User(admin.ModelAdmin):
     search_fields = ('chat_id', 'username')
     actions = [export_json, ban_user, full_ban, unban_user, not_sent_voice]
     fieldsets = [
-        ('Information',
-         {'fields': ('chat_id', 'rank', 'last_date', 'vote', 'username')}
-         ),
-        ('Status',
-         {'fields': ('count', 'menu', 'status', 'sent_message', 'sent_voice')}
-         )
+        ('Information', {'fields': ('chat_id', 'rank', 'last_date', 'vote', 'username')}),
+        ('Status', {'fields': ('count', 'menu', 'status', 'sent_message', 'sent_voice')})
     ]
 
 
@@ -72,20 +72,37 @@ class Voice(admin.ModelAdmin):
     date_hierarchy = 'date'
     list_display = ['voice_id', 'file_id', 'name', 'sender', 'votes', 'status']
     list_filter = ['status', 'voice_type']
-    search_fields = ['name', 'sender__chat_id', 'file_id', 'file_unique_id']
-    actions = [export_json]
+    search_fields = ['name', 'sender__chat_id', 'file_id', 'file_unique_id', 'voice_id']
+    actions = [export_json, 'accept_vote', 'deny_vote']
     list_per_page = 15
     fieldsets = [
-        ('Information',
-         {'fields': ('file_id', 'name', 'file_unique_id')}
-         ),
-        ('Sender',
-         {'fields': ('sender',)}
-         ),
-        ('Status',
-         {'fields': ('status', 'voters', 'votes', 'voice_type')}
-         )
+        ('Information', {'fields': ('file_id', 'name', 'file_unique_id')}),
+        ('Status', {'fields': ('status', 'votes', 'voice_type')})
     ]
+
+    def accept_vote(self, request, queryset):
+        result = [
+            (target_voice, target_voice.accept(), delete_vote(target_voice))
+            for target_voice in queryset if target_voice.status == 'p'
+        ]
+        if (result_len := len(result)) == 0:
+            self.message_user(request, 'There is no need to accept these voices !')
+        elif result_len == 1:
+            self.message_user(request, f'{result[0][0]} has been accepted !')
+        else:
+            self.message_user(request, f'{result_len} Voices have been accepted !')
+
+    def deny_vote(self, request, queryset):
+        result = [
+            (target_voice, target_voice.deny(), delete_vote(target_voice))
+            for target_voice in queryset if target_voice.status == 'p'
+        ]
+        if (result_len := len(result)) == 0:
+            self.message_user(request, 'There is no need to deny these voices !')
+        elif result_len == 1:
+            self.message_user(request, f'{result[0][0]} has been denied !')
+        else:
+            self.message_user(request, f'{result_len} Voices have been denied !')
 
 
 @admin.register(models.Ad)
