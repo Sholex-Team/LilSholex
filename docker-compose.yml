@@ -129,6 +129,12 @@ volumes:
 secrets:
   db_password:
     external: true
+  secret:
+    external: true
+  meme:
+    external: true
+  meme_channel:
+    external: true
 configs:
   nginx:
     file: nginx/sholex.conf
