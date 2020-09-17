@@ -2,21 +2,15 @@
 A Project Containing Telegram API bots and small web apps .
 # Included Projects
 - [Persian Meme](http://t.me/Persian_Meme_Bot)
-- [Group Guard](http://t.me/SholexBot)
-- [Anonymous Chat](http://t.me/AnonymousSholexBot)
-- [Support Bot](http://t.me/SholexSupportbot)
 # Usage
 1. Install Docker
 2. Create a swarm
 3. Create these swarm secrets : 
     - meme : Persian Meme Token
-    - group : Group Guard Token
-    - admin : Admin Panel URL
-    - django : Django Secret Key
-    - support : Support Bot Token
-    - anonymous : Anonymous Chat Token
+    - meme_channel : Persian Meme management channel ID
+    - secret : Django Secret
     - db_password : Database **root** password
-3. `docker stack deploy -c docker-compose.yml {stack name}`
+4. `docker stack deploy -c docker-compose.yml {stack name}`
 
 **Swarm health checks are included and containers will get replaced after running into a problem !**
 
