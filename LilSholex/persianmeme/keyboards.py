@@ -11,8 +11,7 @@ user = {'keyboard': [
     ['امتیازدهی ⭐', 'ارتباط با مدیریت 📬'],
     ['آخرین ویس ها 🆕', 'مرتب سازی 🗂'],
     ['درخواست حذف ویس ✖'],
-    ['حمایت مالی 💸', 'ویس های شخصی 🔒'],
-    ['علاقه مندی ها ❤️']
+    ['ویس های شخصی 🔒', 'علاقه مندی ها ❤️']
 ], 'resize_keyboard': True}
 per_back = {'keyboard': [['بازگشت 🔙']], 'resize_keyboard': True}
 en_back = {'keyboard': [['Back 🔙']], 'resize_keyboard': True}
@@ -48,10 +47,6 @@ def delete_voice(delete_id):
         [{'text': 'Delete', 'callback_data': f'delete:{delete_id}'},
          {'text': 'Deny', 'callback_data': f'delete_deny:{delete_id}'}]
     ]}
-
-
-def donate(price):
-    return {'inline_keyboard': [[{'text': 'حمایت', 'url': f'https://payping.ir/PersianMeme/{price}'}]]}
 
 
 def use(voice_name):

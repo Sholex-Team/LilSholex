@@ -313,7 +313,7 @@ async def webhook_view(request):
                 if text == 'Back 🔙':
                     await user.send_message('You are back at the main menu 🔙', keyboards.owner)
                 else:
-                    ad_id = await create_obj(models.Ad, chat_id=user.database.chat_id, message_id=message_id).ad_id
+                    ad_id = (await create_obj(models.Ad, chat_id=user.database.chat_id, message_id=message_id)).ad_id
                     await user.send_message(
                         f'Update message has been submitted ✔️\nAd ID : {ad_id}', keyboards.owner
                     )
@@ -323,7 +323,7 @@ async def webhook_view(request):
                     await user.send_message('You are back at the main menu 🔙', keyboards.owner)
                 else:
                     try:
-                        models.Ad.objects.get(ad_id=int(text)).delete()
+                        delete_obj(get_obj(models.Ad, ad_id=int(text)))
                     except (ValueError, models.Ad.DoesNotExist):
                         await user.send_message('Ad ID not found !', reply_to_message_id=message_id)
                     else:
@@ -395,9 +395,6 @@ async def webhook_view(request):
                     else:
                         user.database.menu = 8
                         await user.send_message('لطفا ویس مورد نظر را ارسال کنید .', keyboards.per_back)
-                elif text == 'حمایت مالی 💸':
-                    user.database.menu = 10
-                    await user.send_message('لطفا مبلغ مورد نظر را به تومان وارد کنید 💸', keyboards.per_back)
                 elif text == 'ویس های شخصی 🔒':
                     user.database.menu = 11
                     await user.send_message('یکی از گزینه های زیر را انتخاب کنید .', keyboards.private)
@@ -531,22 +528,6 @@ async def webhook_view(request):
                         await owner.send_message('New delete request 🗑')
                     else:
                         await user.send_message('لطفا یک ویس ارسال کنید ⚠')
-            elif user.database.menu == 10:
-                if text == 'بازگشت 🔙':
-                    user.database.menu = 1
-                    await user.send_message('شما در صفحه ی اصلی هستید .', keyboards.user)
-                else:
-                    try:
-                        donate = int(text)
-                    except (ValueError, TypeError):
-                        await user.send_message('مبلغ وارد شده معتبر نیست ✖️')
-                    else:
-                        user.database.menu = 1
-                        await user.send_message(
-                            'برای حمایت مالی از دکمه ی زیر استفاده کنید ❤️',
-                            keyboards.donate(donate)
-                        )
-                        await user.send_message('☝️☝️☝️', keyboards.user)
             elif user.database.menu == 11:
                 if text == 'بازگشت 🔙':
                     user.database.menu = 1

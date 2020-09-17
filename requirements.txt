@@ -24,3 +24,4 @@ yarl==1.5.1
 daphne==2.5.0
 django-background-tasks==1.2.5
 mysqlclient==2.0.1
+psutil==5.7.2
