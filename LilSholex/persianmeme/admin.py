@@ -10,7 +10,13 @@ def export_json(costume_admin, request, queryset):
 
 def ban_user(costume_admin, request, queryset):
     result = queryset.update(status='b')
+<<<<<<< Updated upstream
     if result == 1:
+=======
+    if result == 0:
+        costume_admin.message_user(request, 'There is no need to banned these users !')
+    elif result == 1:
+>>>>>>> Stashed changes
         costume_admin.message_user(request, '1 User has been banned !')
     else:
         costume_admin.message_user(request, f'{result} Users have been banned !')
@@ -18,7 +24,13 @@ def ban_user(costume_admin, request, queryset):
 
 def full_ban(costume_admin, request, queryset):
     result = queryset.update(status='f')
+<<<<<<< Updated upstream
     if result == 1:
+=======
+    if result == 0:
+        costume_admin.message_user(request, 'There is no need to full banned these users !')
+    elif result == 1:
+>>>>>>> Stashed changes
         costume_admin.message_user(request, '1 User has been full banned !')
     else:
         costume_admin.message_user(request, f'{result} Users have been banned !')
@@ -26,7 +38,13 @@ def full_ban(costume_admin, request, queryset):
 
 def unban_user(costume_admin, request, queryset):
     result = queryset.update(status='a')
+<<<<<<< Updated upstream
     if result == 1:
+=======
+    if result == 0:
+        costume_admin.message_user(request, 'There is no need to unbanned these users !')
+    elif result == 1:
+>>>>>>> Stashed changes
         costume_admin.message_user(request, '1 User has been unbanned .')
     else:
         costume_admin.message_user(request, f'{result} Users have been unbanned .')
@@ -87,6 +105,35 @@ class Voice(admin.ModelAdmin):
          )
     ]
 
+<<<<<<< Updated upstream
+=======
+    def accept_vote(self, request, queryset):
+        result = [
+            (target_voice, target_voice.accept(), delete_vote(target_voice))
+            for target_voice in queryset if target_voice.status == 'p'
+        ]
+        result_len = len(result)
+        if result_len == 0:
+            self.message_user(request, 'There is no need to accept these voices !')
+        elif result_len == 1:
+            self.message_user(request, f'{result[0][0]} has been accepted !')
+        else:
+            self.message_user(request, f'{result_len} Voices have been accepted !')
+
+    def deny_vote(self, request, queryset):
+        result = [
+            (target_voice, target_voice.deny(), delete_vote(target_voice))
+            for target_voice in queryset if target_voice.status == 'p'
+        ]
+        result_len = len(result)
+        if result_len == 0:
+            self.message_user(request, 'There is no need to deny these voices !')
+        elif result_len == 1:
+            self.message_user(request, f'{result[0][0]} has been denied !')
+        else:
+            self.message_user(request, f'{result_len} Voices have been denied !')
+
+>>>>>>> Stashed changes
 
 @admin.register(models.Ad)
 class Ad(admin.ModelAdmin):
@@ -105,3 +152,12 @@ class Delete(admin.ModelAdmin):
         'delete_id', 'user__username', 'user__chat_id', 'voice__voice_id', 'voice__file_id', 'voice__file_unique_id'
     )
     fieldsets = (('Information', {'fields': ('delete_id', 'voice', 'user')}),)
+
+
+@admin.register(models.AdminVote)
+class AdminVote(admin.ModelAdmin):
+    list_display = ('id', 'admin', 'count')
+    search_fields = ('admin__chat_id', 'admin__user_id', 'admin__username')
+    readonly_fields = ('id',)
+    list_per_page = 15
+    fieldsets = (('Information', {'fields': ('id', 'admin', 'count')}),)

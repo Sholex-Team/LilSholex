@@ -1,4 +1,15 @@
+<<<<<<< Updated upstream
 from django.db import models
+=======
+import json
+from urllib.parse import urlencode
+import requests
+from django.conf import settings
+from django.db import models
+
+from LilSholex.decorators import fix
+from .keyboards import voice as voice_keyboard
+>>>>>>> Stashed changes
 
 
 class User(models.Model):
@@ -42,6 +53,7 @@ class User(models.Model):
     voice_order = models.CharField(max_length=9, choices=VoiceOrder.choices, default=VoiceOrder.new_voice_id)
     private_voices = models.ManyToManyField('Voice', 'private_voices', verbose_name='Private Voices')
     favorite_voices = models.ManyToManyField('Voice', 'favorite_voices', verbose_name='Favorite Voices')
+    back_menu = models.CharField(max_length=50, null=True, blank=True)
 
     class Meta:
         db_table = 'persianmeme_users'
@@ -78,6 +90,69 @@ class Voice(models.Model):
     def __str__(self):
         return f'{self.name}:{self.file_id}'
 
+<<<<<<< Updated upstream
+=======
+    def accept(self):
+        from .functions import send_message
+        self.status = 'a'
+        self.save()
+        self.sender.sent_voice = False
+        self.sender.save()
+        send_message(self.sender.chat_id, 'ویس ارسالی شما توسط مدیر ربات تایید شد ✅')
+
+    def deny(self):
+        from .functions import send_message
+        self.sender.sent_voice = False
+        self.sender.save()
+        send_message(self.sender.chat_id, 'ویس ارسالی شما توسط مدیر ربات رد شد ❌')
+        self.delete()
+
+    def get_sender(self):
+        return self.sender
+
+    def get_voters_admin(self):
+        return list(self.accept_vote.all()), list(self.deny_vote.all())
+
+    def edit_vote_count(self, message_id: int):
+        accept_votes, deny_votes = self.get_voters_admin()
+        accept_voters = '\n\t'.join(
+            [f'<a href="tg://user?id={user.chat_id}">{user.chat_id}</a>' for user in accept_votes]
+        )
+        deny_voters = '\n\t'.join(
+            [f'<a href="tg://user?id={user.chat_id}">{user.chat_id}</a>' for user in deny_votes]
+        )
+        caption = (
+            f'<b>Sender</b>: {(self.get_sender()).chat_id}\n'
+            f'<b>Voice Info</b>: {self.name}\n\n'
+            f'<b>Accept Voters</b>:\n\t{accept_voters}\n\n'
+            f'<b>Deny Voters</b>:\n\t{deny_voters}'
+        )
+        encoded = urlencode({
+            'caption': caption,
+            'parse_mode': 'Html',
+            'reply_markup': json.dumps(voice_keyboard(len(accept_votes), len(deny_votes)))
+        })
+        requests.get(
+            f'https://api.telegram.org/bot{settings.MEME}/editMessageCaption?chat_id={settings.MEME_CHANNEL}&'
+            f'message_id={message_id}&{encoded}'
+        )
+
+    @fix
+    def send_voice(self) -> int:
+        encoded = urlencode({
+            'caption': f'<b>Sender</b>: {self.sender.chat_id}\n<b>Voice Info</b>: {self.name}',
+            'parse_mode': 'Html',
+            'reply_markup': json.dumps(voice_keyboard())
+        })
+        response = requests.get(
+                f'https://api.telegram.org/bot{settings.MEME}/sendVoice?chat_id={settings.MEME_CHANNEL}&'
+                f'voice={self.file_id}&{encoded}'
+        ).json()
+        if response['ok']:
+            return response['result']['message_id']
+        return 0
+
+>>>>>>> Stashed changes
 
 class Ad(models.Model):
     ad_id = models.AutoField(primary_key=True, verbose_name='Mass ID')
@@ -104,3 +179,20 @@ class Delete(models.Model):
 
     def __str__(self):
         return f'{self.delete_id} : {self.voice.voice_id}'
+<<<<<<< Updated upstream
+=======
+
+    def get_voice(self):
+        return self.voice
+
+    def get_user(self):
+        return self.user
+
+
+class AdminVote(models.Model):
+    admin = models.ForeignKey(User, models.CASCADE, 'vote_admin', verbose_name='Admin')
+    count = models.IntegerField(verbose_name='Count', default=0)
+
+    class Meta:
+        db_table = 'persianmeme_votes'
+>>>>>>> Stashed changes
