@@ -2,6 +2,7 @@ from django.contrib import admin
 from persianmeme import models
 from django.http import HttpResponse
 from django.core.serializers import serialize
+from persianmeme.functions import delete_vote
 
 
 def export_json(costume_admin, request, queryset):
@@ -10,13 +11,9 @@ def export_json(costume_admin, request, queryset):
 
 def ban_user(costume_admin, request, queryset):
     result = queryset.update(status='b')
-<<<<<<< Updated upstream
-    if result == 1:
-=======
     if result == 0:
         costume_admin.message_user(request, 'There is no need to banned these users !')
     elif result == 1:
->>>>>>> Stashed changes
         costume_admin.message_user(request, '1 User has been banned !')
     else:
         costume_admin.message_user(request, f'{result} Users have been banned !')
@@ -24,13 +21,9 @@ def ban_user(costume_admin, request, queryset):
 
 def full_ban(costume_admin, request, queryset):
     result = queryset.update(status='f')
-<<<<<<< Updated upstream
-    if result == 1:
-=======
     if result == 0:
         costume_admin.message_user(request, 'There is no need to full banned these users !')
     elif result == 1:
->>>>>>> Stashed changes
         costume_admin.message_user(request, '1 User has been full banned !')
     else:
         costume_admin.message_user(request, f'{result} Users have been banned !')
@@ -38,75 +31,48 @@ def full_ban(costume_admin, request, queryset):
 
 def unban_user(costume_admin, request, queryset):
     result = queryset.update(status='a')
-<<<<<<< Updated upstream
-    if result == 1:
-=======
     if result == 0:
         costume_admin.message_user(request, 'There is no need to unbanned these users !')
     elif result == 1:
->>>>>>> Stashed changes
         costume_admin.message_user(request, '1 User has been unbanned .')
     else:
         costume_admin.message_user(request, f'{result} Users have been unbanned .')
-
-
-def not_sent_voice(costume_admin, request, queryset):
-    result = queryset.update(sent_voice=False)
-    if result == 0:
-        costume_admin.message_user(request, 'Nothing changed ...')
-    elif result == 1:
-        costume_admin.message_user(request, '1 User has been updated .')
-    else:
-        costume_admin.message_user(request, f'{result} users have been updated .')
 
 
 export_json.short_description = 'Export as Json'
 unban_user.short_description = 'Unban'
 full_ban.short_description = 'Full Ban'
 ban_user.short_description = 'Ban'
-not_sent_voice.short_description = 'Turn off Sent Voice'
 
 
 @admin.register(models.User)
 class User(admin.ModelAdmin):
     date_hierarchy = 'last_usage_date'
     list_display = ('user_id', 'chat_id', 'menu', 'rank', 'status', 'date', 'username')
-    list_filter = ('status', 'rank', 'sent_message', 'sent_voice', 'vote')
+    list_filter = ('status', 'rank', 'sent_message', 'vote', 'started')
     list_per_page = 15
     search_fields = ('chat_id', 'username')
-    actions = [export_json, ban_user, full_ban, unban_user, not_sent_voice]
+    actions = [export_json, ban_user, full_ban, unban_user]
     fieldsets = [
-        ('Information',
-         {'fields': ('chat_id', 'rank', 'last_date', 'vote', 'username')}
-         ),
-        ('Status',
-         {'fields': ('count', 'menu', 'status', 'sent_message', 'sent_voice')}
-         )
+        ('Information', {'fields': ('chat_id', 'rank', 'last_date', 'vote', 'username')}),
+        ('Status', {'fields': ('count', 'menu', 'status', 'sent_message', 'started')})
     ]
 
 
 @admin.register(models.Voice)
 class Voice(admin.ModelAdmin):
     date_hierarchy = 'date'
-    list_display = ['voice_id', 'file_id', 'name', 'sender', 'votes', 'status']
-    list_filter = ['status', 'voice_type']
-    search_fields = ['name', 'sender__chat_id', 'file_id', 'file_unique_id']
-    actions = [export_json]
+    list_display = ('voice_id', 'file_id', 'name', 'sender', 'votes', 'status')
+    list_filter = ('status', 'voice_type')
+    search_fields = ('name', 'sender__chat_id', 'file_id', 'file_unique_id', 'voice_id')
+    actions = (export_json, 'accept_vote', 'deny_vote')
     list_per_page = 15
-    fieldsets = [
-        ('Information',
-         {'fields': ('file_id', 'name', 'file_unique_id')}
-         ),
-        ('Sender',
-         {'fields': ('sender',)}
-         ),
-        ('Status',
-         {'fields': ('status', 'voters', 'votes', 'voice_type')}
-         )
-    ]
+    readonly_fields = ('voice_id', 'date', 'last_check')
+    fieldsets = (
+        ('Information', {'fields': ('voice_id', 'file_id', 'name', 'file_unique_id', 'date')}),
+        ('Status', {'fields': ('status', 'votes', 'voice_type', 'last_check')})
+    )
 
-<<<<<<< Updated upstream
-=======
     def accept_vote(self, request, queryset):
         result = [
             (target_voice, target_voice.accept(), delete_vote(target_voice))
@@ -125,6 +91,7 @@ class Voice(admin.ModelAdmin):
             (target_voice, target_voice.deny(), delete_vote(target_voice))
             for target_voice in queryset if target_voice.status == 'p'
         ]
+        queryset.delete()
         result_len = len(result)
         if result_len == 0:
             self.message_user(request, 'There is no need to deny these voices !')
@@ -133,7 +100,6 @@ class Voice(admin.ModelAdmin):
         else:
             self.message_user(request, f'{result_len} Voices have been denied !')
 
->>>>>>> Stashed changes
 
 @admin.register(models.Ad)
 class Ad(admin.ModelAdmin):
@@ -154,10 +120,11 @@ class Delete(admin.ModelAdmin):
     fieldsets = (('Information', {'fields': ('delete_id', 'voice', 'user')}),)
 
 
-@admin.register(models.AdminVote)
-class AdminVote(admin.ModelAdmin):
-    list_display = ('id', 'admin', 'count')
-    search_fields = ('admin__chat_id', 'admin__user_id', 'admin__username')
-    readonly_fields = ('id',)
+@admin.register(models.Broadcast)
+class Broadcast(admin.ModelAdmin):
+    list_display = ('id', 'message_id', 'sender', 'sent')
+    list_filter = ('sent',)
+    search_fields = ('id', 'message_id', 'sender__chat_id', 'sender__username')
     list_per_page = 15
-    fieldsets = (('Information', {'fields': ('id', 'admin', 'count')}),)
+    readonly_fields = ('id',)
+    fieldsets = (('Information', {'fields': ('id', 'message_id')}), ('Status', {'fields': ('sent',)}))

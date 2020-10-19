@@ -6,16 +6,26 @@ from LilSholex.decorators import fix
 from LilSholex.classes import Base
 from . import steps
 import requests
+from .keyboards import owner
 
 
 class User(Base):
     BASE_URL = f'https://api.telegram.org/bot{settings.MEME}/'
+
+    def broadcast(self, message_id: int):
+        models.Broadcast.objects.create(sender=self.database, message_id=message_id)
+        self.send_message('Broadcasting will start soon .', owner)
     
     def get_user(self):
         return models.User.objects.get_or_create(chat_id=self.chat_id, defaults={'last_date': time.time()})
 
     def __init__(self, chat_id: int = None, instance: models.User = None):
         super().__init__(settings.MEME, chat_id, instance)
+
+    def delete_voice(self, file_unique_id):
+        models.Voice.objects.filter(
+            file_unique_id=file_unique_id, voice_type='n', status='a'
+        ).first().delete(admin=self.database)
 
     @fix
     async def send_voice(self, file_id: str, caption: str, reply_markup: dict = '', reply_to_message_id: int = ''):
@@ -30,6 +40,7 @@ class User(Base):
     def delete_message(self, message_id: int):
         requests.get(f'{self.BASE_URL}deleteMessage', params={**self.BASE_PARAM, 'message_id': message_id})
 
+    @fix
     def forward_message(self, from_chat_id: int, message_id: int):
         requests.get(
             f'{self.BASE_URL}forwardMessage',
@@ -171,7 +182,7 @@ class User(Base):
             voice_type='n'
         )
         if target_voices.exists():
-            target_voices.delete()
+            target_voices.first().delete(dont_send=True)
             return True
     
     def send_help(self):
@@ -195,3 +206,9 @@ class User(Base):
         self.database.back_menu = step.get('before')
         self.send_message(step['message'], step.get('keyboard', ''))
         self.save()
+
+    @fix
+    def record_audio(self):
+        self.database.started = requests.get(
+                f'{self.BASE_URL}sendChatAction', params={**self.BASE_PARAM, 'action': 'record_audio'}
+        ).status_code != 403

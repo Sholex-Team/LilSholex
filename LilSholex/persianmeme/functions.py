@@ -1,21 +1,18 @@
-<<<<<<< Updated upstream
-from persianmeme import models
-import faster_than_requests as fast_req
-from urllib.parse import urlencode
-from django.conf import settings
-from groupguard.decorators import fix
-=======
 from urllib.parse import urlencode
 from django.conf import settings
 from LilSholex.decorators import fix
 from LilSholex.functions import answer_callback_query as answer_callback_query_closure
 from . import models
 import requests
->>>>>>> Stashed changes
+import json
+from .translations import user_messages
+from .keyboards import bot
 
 
 def get_voice(file_unique_id, voice_type='n'):
-    return models.Voice.objects.filter(file_unique_id=file_unique_id, status='a', voice_type=voice_type)
+    target_voice = models.Voice.objects.filter(file_unique_id=file_unique_id, status='a', voice_type=voice_type)
+    if target_voice.exists():
+        return target_voice.first()
 
 
 def get_owner():
@@ -24,11 +21,9 @@ def get_owner():
 
 def add_voice(file_id, file_unique_id, name, sender, status):
     if not models.Voice.objects.filter(file_unique_id=file_unique_id, voice_type='n').exists():
-        models.Voice.objects.create(
+        return models.Voice.objects.create(
             file_id=file_id, file_unique_id=file_unique_id, name=name, sender=sender, status=status
         )
-        return True
-    return False
 
 
 def count_voices():
@@ -40,37 +35,20 @@ def change_user_status(chat_id, status):
     models.User.objects.filter(chat_id=chat_id).update(status=status)
 
 
-def get_admins():
-    return models.User.objects.filter(rank__in=['a', 'o'])
-
-
 @fix
-def answer_inline_query(inline_query_id, results, next_offset, cache_time):
+def answer_inline_query(inline_query_id: str, results: str, next_offset: str, cache_time: float):
     encoded = urlencode({'results': results})
-<<<<<<< Updated upstream
-    fast_req.get(f'https://api.telegram.org/bot{settings.MEME}/answerInlineQuery?inline_query_id={inline_query_id}&'
-                 f'{encoded}&next_offset={next_offset}&cache_time={cache_time}&is_personal=True')
-=======
     requests.get(
         f'https://api.telegram.org/bot{settings.MEME}/answerInlineQuery?inline_query_id={inline_query_id}&'
         f'{encoded}&next_offset={next_offset}&cache_time={cache_time}&is_personal=True'
     )
->>>>>>> Stashed changes
 
 
-def delete_voice(file_unique_id):
-    models.Voice.objects.filter(file_unique_id=file_unique_id, voice_type='n', status='a').delete()
-
-
-@fix
-def answer_callback_query(query_id, text, show_alert):
-    encoded = urlencode({'text': text})
-    fast_req.get(
-        f'https://api.telegram.org/bot{settings.MEME}/answerCallbackQuery?callback_query_id={query_id}&{encoded}&'
-        f'show_alert={show_alert}'
+def delete_vote(voice: models.Voice):
+    requests.get(
+            f'https://api.telegram.org/bot{settings.MEME}/deleteMessage?chat_id={settings.MEME_CHANNEL}'
+            f'&message_id={voice.message_id}'
     )
-<<<<<<< Updated upstream
-=======
 
 
 def check_voice(file_unique_id: str):
@@ -107,9 +85,11 @@ def get_delete_requests():
     return models.Delete.objects.all()
 
 
-def kick_admin(chat_id: int):
-    requests.get(
-        f'https://api.telegram.org/bot{settings.MEME}/kickChatMember',
-        params={'chat_id': settings.MEME_CHANNEL, 'user_id': chat_id}
-    )
->>>>>>> Stashed changes
+def start_bot_first():
+    return json.dumps([{
+        'type': 'article',
+        'id': 'error',
+        'title': user_messages['start_bot_title'],
+        'input_message_content': {'message_text': user_messages['start_bot']},
+        'reply_markup': bot
+    }])

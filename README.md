@@ -10,6 +10,7 @@ A Project Containing Telegram API bots and small web apps .
 2. Create a swarm
 3. Create these swarm secrets : 
     - meme : Persian Meme Token
+    - meme_channel : Persian Meme management channel ID
     - group : Group Guard Token
     - admin : Admin Panel URL
     - django : Django Secret Key
