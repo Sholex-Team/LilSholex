@@ -99,11 +99,11 @@ class Voice(models.Model):
             admin = f' by {kwargs.pop("admin")}' if kwargs.get('admin') else ''
             send_message(
                 settings.MEME_LOGS,
-                translations.admin_messages['delete_by_admins'].format(admin, self.name, self.file_id)
+                translations.admin_messages['deleted_by_admins'].format(admin, self.name, self.file_id)
             )
             send_message(
                 self.sender.chat_id,
-                translations.user_messages['delete_by_admins'].format(self.name)
+                translations.user_messages['deleted_by_admins'].format(self.name)
             )
         else:
             del kwargs['dont_send']
