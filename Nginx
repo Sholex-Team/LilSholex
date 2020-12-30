@@ -1,0 +1,27 @@
+FROM ubuntu:focal
+# Compiling
+RUN apt update && apt install -y build-essential \
+&& apt install -y openssl libpcre3 libpcre3-dev zlib1g zlib1g-dev openssl libssl-dev python3.9 python3-pip \
+&& apt autoremove -y && apt autoclean
+RUN python3.9 -m pip install --no-cache-dir requests
+WORKDIR /root
+ADD http://nginx.org/download/nginx-1.19.4.tar.gz /root/nginx.tar.gz
+RUN tar -xzf nginx.tar.gz
+WORKDIR /root/nginx-1.19.4
+RUN ./configure --http-log-path=/var/log/nginx/access.log --error-log-path=/var/log/nginx/error.log \
+--pid-path=/var/run/nginx.pid --conf-path=/etc/nginx/nginx.conf --without-http_autoindex_module \
+--without-http_auth_basic_module --without-http_fastcgi_module --without-http_uwsgi_module --with-pcre \
+--with-http_v2_module --with-http_ssl_module --with-http_realip_module --with-http_gzip_static_module \
+--sbin-path=/usr/bin/nginx
+RUN make && make install
+WORKDIR /root
+# Adding healtcheks
+ADD healthchecks/nginx.py nginx.py
+# Volumes
+VOLUME /var/log/nginx
+# Opening Ports
+EXPOSE 80/tcp
+EXPOSE 443/tcp
+# Launch
+STOPSIGNAL SIGTERM
+CMD nginx -g "daemon off;"
