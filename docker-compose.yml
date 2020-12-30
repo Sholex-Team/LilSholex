@@ -360,6 +360,8 @@ secrets:
     file: ./ssl/privkey.pem
   dhparam:
     file: ./ssl/dhparam.pem
+  domain:
+    external: true
 configs:
   nginx:
     file: conf/nginx.conf

@@ -16,7 +16,10 @@ A Project Containing Telegram API bots and small web apps .
    - ssl_certificate : SSL certificate
    - ssl_key : SSL private key
    - dhparam : SSL dhparam
-4. `docker stack deploy -c docker-compose.yml {stack name}`
+   - domain : Your Domain
+4. Replace {persianmeme_token} & {domain} inside conf/nginx.conf with
+   your domain and bot token
+5. `docker stack deploy -c docker-compose.yml {stack name}`
 
 **Swarm health checks are included and containers will get replaced after running into a problem !**
 
