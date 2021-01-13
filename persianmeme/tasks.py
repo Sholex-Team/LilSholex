@@ -31,7 +31,7 @@ def check_voice(voice_id: int):
 @background(schedule=300)
 def update_votes(voice_id: int):
     try:
-        voice = Voice.objects.get(voice_id=voice_id)
+        voice = Voice.objects.get(voice_id=voice_id, status=Voice.Status.PENDING)
     except Voice.DoesNotExist:
         return
     voice.edit_vote_count()

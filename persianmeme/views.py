@@ -204,7 +204,20 @@ async def webhook(request):
         if text in ('بازگشت 🔙', 'Back 🔙'):
             await user.go_back()
             return HttpResponse(status=200)
-        if user.database.rank != 'u':
+        if user.database.rank != user.database.Rank.USER:
+            if text == '/admin':
+                user.database.menu_mode = user.database.MenuMode.ADMIN
+                user.database.menu = 1
+                await user.send_message(translations.admin_messages['admin_panel'], keyboards.owner, message_id)
+                await user.save()
+                return HttpResponse(status=200)
+            elif text == '/user':
+                user.database.menu_mode = user.database.MenuMode.USER
+                user.database.menu = 1
+                await user.send_message(translations.user_messages['user_panel'], keyboards.user, message_id)
+                await user.save()
+                return HttpResponse(status=200)
+        if user.database.rank != 'u' and user.database.menu_mode == user.database.MenuMode.ADMIN:
             if text == '/start':
                 user.database.menu = 1
                 await user.send_message(translations.admin_messages['welcome'], keyboards.owner, message_id)
@@ -221,8 +234,14 @@ async def webhook(request):
                         translations.admin_messages['member_count'].format(await functions.count_users())
                     )
                 # Admins & Owner section
-                elif user.database.rank in ('a', 'o') and text in (
-                        'Get User', 'Ban a User', 'Unban a User', 'Full Ban', 'Delete Sound', 'Accepted'
+                elif user.database.rank in models.BOT_ADMINS and text in (
+                    'Get User',
+                    'Ban a User',
+                    'Unban a User',
+                    'Full Ban',
+                    'Delete Sound',
+                    'Accepted',
+                    'Ban Vote'
                 ):
                     if text == 'Get User':
                         user.database.menu = 12
@@ -253,8 +272,11 @@ async def webhook(request):
                             await user.send_message(
                                 translations.admin_messages['no_accepted'], reply_to_message_id=message_id
                             )
+                    elif text == 'Ban Vote':
+                        user.database.menu = 16
+                        await user.send_message(translations.admin_messages['send_a_voice'], keyboards.en_back)
                 # Owner Section
-                elif user.database.rank == 'o' and text in (
+                elif user.database.rank == user.database.Rank.OWNER and text in (
                         'Message User', 'Add Ad', 'Delete Ad', 'Delete Requests', 'Broadcast', 'Edit Ad'
                 ):
                     if text == 'Message User':
@@ -427,7 +449,18 @@ async def webhook(request):
                     await user.send_message(translations.admin_messages['ad_edited'], keyboards.owner)
                 else:
                     await user.send_message(translations.admin_messages['ad_deleted'], keyboards.owner)
-        elif user.database.status == 'a' and user.database.rank == 'u':
+            elif user.database.menu == 16:
+                if user.voice_exists(message):
+                    if target_voice := await functions.get_vote(message['voice']['file_unique_id']):
+                        await functions.delete_vote_async(target_voice.message_id, request.http_session)
+                        await target_voice.ban_sender()
+                        user.database.menu = 1
+                        await user.send_message(translations.admin_messages['ban_voted'], keyboards.owner)
+                    else:
+                        await user.send_message(translations.admin_messages['voice_not_found'])
+        elif user.database.status == user.database.Status.ACTIVE and \
+                (user.database.rank == user.database.Rank.USER or
+                 user.database.menu_mode == user.database.MenuMode.USER):
             if text and text.startswith('/start'):
                 if len(splinted_text := text.split(' ')) == 2:
                     try:

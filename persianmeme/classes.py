@@ -262,12 +262,12 @@ class User(Base):
 
     async def go_back(self):
         try:
-            if self.database.rank != self.database.Rank.USER:
+            if self.database.menu_mode != self.database.MenuMode.USER:
                 step = steps.admin_steps[self.database.back_menu]
             else:
                 step = steps.user_steps[self.database.back_menu]
         except KeyError:
-            if self.database.rank != self.database.Rank.USER:
+            if self.database.menu_mode != self.database.MenuMode.USER:
                 step = steps.admin_steps['main']
             else:
                 step = steps.user_steps['main']

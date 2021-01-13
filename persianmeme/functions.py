@@ -19,6 +19,16 @@ from .types import ObjectType
 
 
 @sync_to_async
+def get_vote(file_unique_id):
+    target_voice = models.Voice.objects.filter(
+        file_unique_id=file_unique_id,
+        status=models.Voice.Status.PENDING
+    )
+    if target_voice.exists():
+        return target_voice.first()
+
+
+@sync_to_async
 def get_voice(file_unique_id, voice_type=models.Voice.Type.NORMAL):
     target_voice = models.Voice.objects.filter(
         file_unique_id=file_unique_id,
@@ -57,20 +67,34 @@ def change_user_status(chat_id, status):
 async def answer_inline_query(
         inline_query_id: str, results: str, next_offset: str, cache_time: float, session: ClientSession
 ):
-    encoded = urlencode({'results': results})
     async with session.get(
-        f'https://api.telegram.org/bot{settings.MEME}/answerInlineQuery?inline_query_id={inline_query_id}&'
-        f'{encoded}&next_offset={next_offset}&cache_time={cache_time}&is_personal=True'
+        f'https://api.telegram.org/bot{settings.MEME}/answerInlineQuery',
+        params={
+            'results': results,
+            'next_offset': next_offset,
+            'cache_time': cache_time,
+            'is_personal': str(True),
+            'inline_query_id': inline_query_id
+        }
     ) as _:
-        pass
+        return
 
 
 @decorators.sync_fix
 def delete_vote_sync(voice: models.Voice):
     requests.get(
-            f'https://api.telegram.org/bot{settings.MEME}/deleteMessage?chat_id={settings.MEME_CHANNEL}'
-            f'&message_id={voice.message_id}'
+        f'https://api.telegram.org/bot{settings.MEME}/deleteMessage',
+        params={'chat_id': settings.MEME_CHANNEL, 'message_id': voice.message_id}
     )
+
+
+@decorators.async_fix
+async def delete_vote_async(message_id: int, session: ClientSession):
+    async with session.get(
+        f'https://api.telegram.org/bot{settings.MEME}/deleteMessage',
+        params={'chat_id': settings.MEME_CHANNEL, 'message_id': message_id}
+    ) as _:
+        return
 
 
 @sync_to_async

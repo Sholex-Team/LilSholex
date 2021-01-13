@@ -12,7 +12,7 @@ numbers = {
 }
 owner = {'keyboard': [
     ['Add Sound', 'Delete Sound', 'Voice Count', 'Member Count'],
-    ['Ban a User', 'Edit Ad'],
+    ['Ban a User', 'Edit Ad', 'Ban Vote'],
     ['Unban a User', 'Full Ban', 'Message User'],
     ['Get User', 'Broadcast', 'Accepted'],
     ['Add Ad', 'Delete Ad', 'Delete Requests']

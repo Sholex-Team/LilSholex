@@ -72,18 +72,21 @@ class User(admin.ModelAdmin):
         'status',
         'date',
         'username',
+        'menu_mode',
         count_playlists,
         current_playlist,
         current_voice
     )
-    list_filter = ('status', 'rank', 'sent_message', 'vote', 'started', 'voice_order')
+    list_filter = ('status', 'rank', 'sent_message', 'vote', 'started', 'voice_order', 'menu_mode')
     list_per_page = 15
     search_fields = ('chat_id', 'username')
     readonly_fields = ('user_id', 'date', 'last_usage_date')
     actions = [export_json, ban_user, full_ban, unban_user]
     fieldsets = [
         ('Information', {'fields': ('user_id', 'chat_id', 'rank', 'vote', 'username', 'date', 'voice_order')}),
-        ('Status', {'fields': ('menu', 'status', 'sent_message', 'started', 'last_usage_date', 'last_start')})
+        ('Status', {'fields': (
+            'menu', 'status', 'sent_message', 'started', 'last_usage_date', 'last_start', 'menu_mode'
+        )})
     ]
 
 

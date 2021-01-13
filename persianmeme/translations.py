@@ -39,7 +39,9 @@ admin_messages = {
     'ad_edited': 'Ad has been edited ✔️',
     'send_a_voice': 'Please send a voice ⚠️',
     'deleted_by_admins': 'Voice has been deleted{0} !\nName : {1}\nFile ID : {2}',
-    'voice_accepted': 'A new voice accepted ⚠️'
+    'voice_accepted': 'A new voice accepted ⚠️',
+    'admin_panel': 'Admin panel activated 🔛',
+    'ban_voted': 'Voice has been deleted and user got banned !'
 }
 user_messages = {
     'back': 'شما به منوی اصلی بازگشتید 🔙',
@@ -50,19 +52,19 @@ user_messages = {
     'vote_before': 'شما قبلا به این ویس رای داده اید ⚠️\nنتایج هر ۵ دقیقه به روزرسانی می شوند 🔄',
     'voted': 'رای شما ثبت شد ✔️',
     'donate': '''برای حمایت مالی از ما می توانید از روش های زیر استفاده کنید 👇
-    
+
     PayPing : https://payping.ir/RezFD
-    
+
     IDPay : https://idpay.ir/persianmeme
-    
+
     Bitcoin : `12wL8ggGqNA52JKUGtAP9TrNNxKUw5E7tT`
-    
+
     Ether : `0x15ce953E6dd57b64f4360DE14a2DE00f87d7be06`
-    
+
     Tether : `0x15ce953E6dd57b64f4360DE14a2DE00f87d7be06`
-    
+
     Litecoin: `Lc7rPW4vgbeKwEYQw7gt7kmJ1grY9vWvoR`
-    
+
     از حمایت های شما مچکریم 🙏''',
     'manage_playlists': 'مدیریت پلی لیست ها 👇',
     'manage_playlist': 'مدیریت پلی لیست 👇',
@@ -92,8 +94,8 @@ user_messages = {
     'select_order': 'لطفا یکی از روش های مرتب سازی زیر را انتخاب کنید 👇',
     'pending_request': 'درخواست قبلی شما در حال بررسی است ⚠',
     'voice': 'لطفا ویس مورد نظر را ارسال کنید .',
-    'voice_info':  'نام ویس : {0}\n\nشما میتوانید با تایپ\n\n'
-                   '@Persian_Meme_Bot {0}\n\n از این ویس استفاده کنید 😁',
+    'voice_info': 'نام ویس : {0}\n\nشما میتوانید با تایپ\n\n'
+                  '@Persian_Meme_Bot {0}\n\n از این ویس استفاده کنید 😁',
     'voice_not_found': 'نتونستم این ویس رو پیدا کنم ☹',
     'message_sent': 'پیام شما به مدیریت ارسال شد ✔',
     'invalid_voice_name': 'نام ویس معتبر نیست ❌\nنام باید متن ساده و حداکثر ۵۰ کارکتر باشد !',
@@ -128,5 +130,6 @@ user_messages = {
     'no_voice': 'ویسی وجود ندارد ⚠️',
     'deleted_by_admins': 'ویس {0} توسط ادمین های ربات پاک شد 🚮',
     'voice_accepted': 'ویس ارسالی شما توسط کاربران ربات تایید شد ✅',
-    'voice_denied': 'ویس ارسالی شما توسط کاربران ربات رد شد ❌'
+    'voice_denied': 'ویس ارسالی شما توسط کاربران ربات رد شد ❌',
+    'user_panel': 'پنل کاربری فعال شد 🔛'
 }

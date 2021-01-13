@@ -29,6 +29,10 @@ class User(models.Model):
         high_votes = '-votes', 'Votes (High to Low)'
         new_voice_id = '-voice_id', 'Voice ID (New to Old)'
 
+    class MenuMode(models.TextChoices):
+        ADMIN = 'a', 'Admin'
+        USER = 'u', 'User'
+
     user_id = models.AutoField(verbose_name='User ID', primary_key=True, unique=True)
     chat_id = models.BigIntegerField(verbose_name='User Chat ID', unique=True)
     menu = models.IntegerField(verbose_name='Current Menu', default=1)
@@ -74,6 +78,9 @@ class User(models.Model):
         default=None
     )
     current_ad = models.ForeignKey('Ad', models.SET_NULL, 'user_ad', null=True, blank=True, verbose_name='Current Ad')
+    menu_mode = models.CharField(
+        max_length=1, verbose_name='Menu Mode', choices=MenuMode.choices, default=MenuMode.USER
+    )
 
     class Meta:
         db_table = 'persianmeme_users'
@@ -92,6 +99,12 @@ class Voice(models.Model):
     class Type(models.TextChoices):
         NORMAL = 'n', 'Normal'
         PRIVATE = 'p', 'Private'
+
+    @sync_to_async
+    def ban_sender(self):
+        self.sender.status = self.sender.Status.BANNED
+        self.sender.save()
+        self.deny()
 
     def delete(self, *args, **kwargs):
         if not kwargs.get('dont_send'):
