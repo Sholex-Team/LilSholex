@@ -41,7 +41,8 @@ admin_messages = {
     'deleted_by_admins': 'Voice has been deleted{0} !\nName : {1}\nFile ID : {2}',
     'voice_accepted': 'A new voice accepted ⚠️',
     'admin_panel': 'Admin panel activated 🔛',
-    'ban_voted': 'Voice has been deleted and user got banned !'
+    'ban_voted': 'Voice has been deleted and user got banned !',
+    'processed_before': 'Voice has been processed before !'
 }
 user_messages = {
     'back': 'شما به منوی اصلی بازگشتید 🔙',

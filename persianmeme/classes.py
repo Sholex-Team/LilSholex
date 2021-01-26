@@ -37,6 +37,18 @@ class User(Base):
         super().__init__(settings.MEME, chat_id, instance, session)
 
     @sync_to_async
+    def delete_semi_active(self, file_unique_id: str):
+        if result := filter_object(
+            models.Voice.objects,
+            True,
+            file_unique_id=file_unique_id,
+            status=models.Voice.Status.SEMI_ACTIVE
+        ):
+            result.delete(admin=self.database)
+            return True
+        return False
+
+    @sync_to_async
     def delete_voice(self, file_unique_id):
         if result := filter_object(
             models.Voice.objects,

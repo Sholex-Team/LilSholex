@@ -79,7 +79,7 @@ class User(admin.ModelAdmin):
     )
     list_filter = ('status', 'rank', 'sent_message', 'vote', 'started', 'voice_order', 'menu_mode')
     list_per_page = 15
-    search_fields = ('chat_id', 'username')
+    search_fields = ('user_id','chat_id', 'username')
     readonly_fields = ('user_id', 'date', 'last_usage_date')
     actions = [export_json, ban_user, full_ban, unban_user]
     fieldsets = [
@@ -95,7 +95,7 @@ class Voice(admin.ModelAdmin):
     date_hierarchy = 'date'
     list_display = ('voice_id', 'file_id', 'name', 'sender', 'votes', 'status')
     list_filter = ('status', 'voice_type')
-    search_fields = ('name', 'sender__chat_id', 'file_id', 'file_unique_id', 'voice_id')
+    search_fields = ('name', 'sender__chat_id', 'file_id', 'file_unique_id', 'voice_id', 'sender__user_id')
     actions = (export_json, 'accept_vote', 'deny_vote')
     list_per_page = 15
     readonly_fields = ('voice_id', 'date', 'last_check')

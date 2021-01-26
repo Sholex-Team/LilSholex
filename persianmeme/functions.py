@@ -5,7 +5,7 @@ from LilSholex.functions import answer_callback_query as answer_callback_query_c
 from . import models
 import requests
 import json
-
+from uuid import uuid4
 from .models import Broadcast
 from .translations import user_messages
 from .keyboards import bot
@@ -154,7 +154,9 @@ def get_all_accepted():
 
 @sync_to_async
 def accept_voice(file_unique_id: str):
-    if (voice := models.Voice.objects.filter(file_unique_id=file_unique_id)).exists():
+    if (
+            voice := models.Voice.objects.filter(file_unique_id=file_unique_id, status=models.Voice.Status.SEMI_ACTIVE)
+    ).exists():
         voice = voice.first()
         voice.status = models.Voice.Status.ACTIVE
         voice.save()
@@ -201,7 +203,7 @@ async def perform_broadcast(broadcast: Broadcast):
 def make_like_result(voices, offset: int, limit: int):
     return [{
         'type': 'voice',
-        'id': voice.voice_id,
+        'id': str(uuid4()),
         'voice_file_id': voice.file_id,
         'title': voice.name,
         'reply_markup': {'inline_keyboard': [
@@ -214,7 +216,7 @@ def make_like_result(voices, offset: int, limit: int):
 def make_result(voices, offset: int, limit: int):
     return [{
         'type': 'voice',
-        'id': voice.voice_id,
+        'id': str(uuid4()),
         'voice_file_id': voice.file_id,
         'title': voice.name
     } for voice in voices[offset:offset + limit]]

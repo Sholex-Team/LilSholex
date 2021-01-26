@@ -15,6 +15,7 @@ import json
 from aiohttp import ClientSession
 from . import translations
 from .types import ObjectType
+from django.forms import ValidationError
 
 
 async def webhook(request):
@@ -125,8 +126,10 @@ async def webhook(request):
             await user.save()
         elif callback_data[0] in ('admin_accept', 'admin_deny'):
             if callback_data[0] == 'admin_deny':
-                await inliner.delete_voice(message['voice']['file_unique_id'])
-                await answer_query(query_id, translations.user_messages['deleted'], False)
+                if await inliner.delete_semi_active(message['voice']['file_unique_id']):
+                    await answer_query(query_id, translations.admin_messages['deleted'], False)
+                else:
+                    await answer_query(query_id, translations.admin_messages['processed_before'], False)
             elif callback_data[0] == 'admin_accept':
                 if await functions.accept_voice(message['voice']['file_unique_id']):
                     await answer_query(query_id, translations.admin_messages['accepted'], False)
@@ -472,7 +475,7 @@ async def webhook(request):
                             await user.send_message(
                                 translations.user_messages['already_joined_playlist'], keyboards.user
                             )
-                    except (models.Playlist.DoesNotExist, ValueError):
+                    except (models.Playlist.DoesNotExist, ValidationError):
                         await user.send_message(translations.user_messages['invalid_playlist'], keyboards.user)
                 else:
                     await user.send_message(translations.user_messages['welcome'], keyboards.user)
