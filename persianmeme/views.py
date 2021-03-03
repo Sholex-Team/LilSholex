@@ -462,20 +462,20 @@ async def webhook(request):
                 else:
                     await user.send_message(translations.admin_messages['ad_deleted'], keyboards.owner)
             elif user.database.menu == 16:
-                if user.voice_exists(message) and \
+                if await user.voice_exists(message) and \
                         (target_voice := await user.get_vote(message['voice']['file_unique_id'])):
                     await functions.delete_vote_async(target_voice.message_id, request.http_session)
                     await target_voice.ban_sender()
                     user.database.menu = 1
                     await user.send_message(translations.admin_messages['ban_voted'], keyboards.owner)
             elif user.database.menu == 17:
-                if user.voice_exists(message) and \
+                if await user.voice_exists(message) and \
                         (target_voice := await user.get_vote(message['voice']['file_unique_id'])):
                     await user.deny_voice(target_voice)
                     user.database.menu = 1
                     await user.send_message(translations.admin_messages['admin_voice_denied'], keyboards.owner)
             elif user.database.menu == 18:
-                if user.voice_exists(message) and \
+                if await user.voice_exists(message) and \
                         (target_voice := await user.get_vote(message['voice']['file_unique_id'])):
                     await user.accept_voice(target_voice)
                     user.database.menu = 1
