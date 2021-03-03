@@ -9,7 +9,7 @@ from background_task.models import CompletedTask
 def check_voice(voice_id: int):
     CompletedTask.objects.all().delete()
     try:
-        voice = Voice.objects.get(voice_id=voice_id, status=Voice.Status.PENDING)
+        voice = Voice.objects.get(voice_id=voice_id, status='p')
     except Voice.DoesNotExist:
         return
     aware_date = voice.last_check.astimezone(ZoneInfo('Asia/Tehran'))

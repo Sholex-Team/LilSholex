@@ -123,8 +123,10 @@ def delete_target_voice(target_delete: models.Delete):
 
 @decorators.sync_fix
 def send_message(chat_id: int, text: str):
-    encoded = urlencode({'chat_id': chat_id, 'text': text})
-    requests.get(f'https://api.telegram.org/bot{settings.MEME}/sendMessage?{encoded}')
+    requests.get(
+        f'https://api.telegram.org/bot{settings.MEME}/sendMessage',
+        params={'chat_id': chat_id, 'text': text}
+    )
 
 
 @sync_to_async
@@ -171,7 +173,7 @@ def get_page(broadcast: models.Broadcast):
     )[:settings.PAGINATION_LIMIT])
     if result:
         models.User.objects.filter(
-            user_id__gte=result[0], user_id__lte=result[-1], started=True
+            user_id__gte=result[0].user_id, user_id__lte=result[-1].user_id, started=True
         ).update(last_broadcast=broadcast)
     return result
 

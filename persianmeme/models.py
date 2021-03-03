@@ -52,14 +52,14 @@ class User(models.Model):
     date = models.DateTimeField(verbose_name='Register Date', auto_now_add=True)
     voice_order = models.CharField(max_length=9, choices=VoiceOrder.choices, default=VoiceOrder.new_voice_id)
     private_voices = models.ManyToManyField('Voice', 'private_voices', verbose_name='Private Voices')
-    favorite_voices = models.ManyToManyField('Voice', 'favorite_voices', verbose_name='Favorite Voices')
+    favorite_voices = models.ManyToManyField('Voice', 'favorite_voices', verbose_name='Favorite Voices', blank=True)
     back_menu = models.CharField(max_length=50, null=True, blank=True)
     started = models.BooleanField('Started', default=False)
     last_start = models.DateTimeField(null=True, blank=True, verbose_name='Last Start')
     last_broadcast = models.ForeignKey(
         'Broadcast', models.SET_NULL, 'user_broadcast', null=True, blank=True, verbose_name='Last Broadcast'
     )
-    playlists = models.ManyToManyField('Playlist', 'user_playlist', verbose_name='Playlists')
+    playlists = models.ManyToManyField('Playlist', 'user_playlist', verbose_name='Playlists', blank=True)
     current_playlist = models.ForeignKey(
         'Playlist',
         models.SET_NULL,
@@ -144,10 +144,26 @@ class Voice(models.Model):
     def __str__(self):
         return f'{self.name}:{self.file_id}'
 
+    @sync_to_async
+    def async_accept(self):
+        self.status = self.Status.SEMI_ACTIVE
+        self.save()
+        self.accept_vote.clear()
+        self.deny_vote.clear()
+        return self.sender
+
+    @sync_to_async
+    def async_deny(self):
+        sender = self.sender
+        self.delete(dont_send=True)
+        return sender
+
     def accept(self):
         from .functions import send_message
         self.status = self.Status.SEMI_ACTIVE
         self.save()
+        self.accept_vote.clear()
+        self.deny_vote.clear()
         send_message(self.sender.chat_id, translations.user_messages['voice_accepted'])
         for admin in User.objects.filter(rank=User.Rank.ADMIN):
             send_message(admin.chat_id, translations.admin_messages['voice_accepted'])
@@ -235,6 +251,9 @@ class Broadcast(models.Model):
     @sync_to_async
     def get_sender(self):
         return self.sender
+
+    def __str__(self):
+        return f'{self.id}:{self.message_id}'
 
     class Meta:
         db_table = 'persianmeme_broadcasts'

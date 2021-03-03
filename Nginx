@@ -5,9 +5,9 @@ RUN apt update && apt install -y build-essential \
 && apt autoremove -y && apt autoclean
 RUN python3.9 -m pip install --no-cache-dir requests
 WORKDIR /root
-ADD http://nginx.org/download/nginx-1.19.6.tar.gz /root/nginx.tar.gz
+ADD http://nginx.org/download/nginx-1.19.7.tar.gz /root/nginx.tar.gz
 RUN tar -xzf nginx.tar.gz
-WORKDIR /root/nginx-1.19.6
+WORKDIR /root/nginx-1.19.7
 RUN ./configure --http-log-path=/var/log/nginx/access.log --error-log-path=/var/log/nginx/error.log \
 --pid-path=/var/run/nginx.pid --conf-path=/etc/nginx/nginx.conf --without-http_autoindex_module \
 --without-http_auth_basic_module --without-http_fastcgi_module --without-http_uwsgi_module --with-pcre \

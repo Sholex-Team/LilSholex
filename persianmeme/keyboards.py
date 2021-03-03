@@ -15,7 +15,8 @@ owner = {'keyboard': [
     ['Ban a User', 'Edit Ad', 'Ban Vote'],
     ['Unban a User', 'Full Ban', 'Message User'],
     ['Get User', 'Broadcast', 'Accepted'],
-    ['Add Ad', 'Delete Ad', 'Delete Requests']
+    ['Add Ad', 'Delete Ad', 'Delete Requests'],
+    ['Accept Voice', 'Deny Voice']
 ], 'resize_keyboard': True}
 user = {'keyboard': [
     ['لغو رای گیری ⏹'],

@@ -42,7 +42,9 @@ admin_messages = {
     'voice_accepted': 'A new voice accepted ⚠️',
     'admin_panel': 'Admin panel activated 🔛',
     'ban_voted': 'Voice has been deleted and user got banned !',
-    'processed_before': 'Voice has been processed before !'
+    'processed_before': 'Voice has been processed before !',
+    'admin_voice_denied': 'Voice has been denied !',
+    'admin_voice_accepted': 'Voice has been accepted !'
 }
 user_messages = {
     'back': 'شما به منوی اصلی بازگشتید 🔙',

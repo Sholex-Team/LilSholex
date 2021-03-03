@@ -20,7 +20,6 @@ from django.forms import ValidationError
 
 async def webhook(request):
     update = json.loads(request.body.decode())
-    answer_query = functions.answer_callback_query(request.http_session)
     if 'inline_query' in update:
         query = update['inline_query']['query']
         offset = update['inline_query']['offset']
@@ -42,6 +41,7 @@ async def webhook(request):
                 inline_query_id, json.dumps(results), next_offset, 300, request.http_session
             )
     elif 'callback_query' in update:
+        answer_query = functions.answer_callback_query(request.http_session)
         callback_query = update['callback_query']
         if callback_query['data'] == 'none':
             return HttpResponse(status=200)
@@ -116,6 +116,7 @@ async def webhook(request):
         elif callback_data[0] == 'reply':
             user = await classes.User(request.http_session, classes.User.Mode.NORMAL, callback_data[1])
             inliner.database.menu = 9
+            inliner.database.menu_mode = inliner.database.MenuMode.ADMIN
             inliner.database.back_menu = 'chat_id'
             inliner.database.temp_user_id = user.database.chat_id
             await inliner.send_message(translations.admin_messages['reply'], keyboards.en_back)
@@ -244,7 +245,9 @@ async def webhook(request):
                     'Full Ban',
                     'Delete Sound',
                     'Accepted',
-                    'Ban Vote'
+                    'Ban Vote',
+                    'Accept Voice',
+                    'Deny Voice'
                 ):
                     if text == 'Get User':
                         user.database.menu = 12
@@ -277,6 +280,12 @@ async def webhook(request):
                             )
                     elif text == 'Ban Vote':
                         user.database.menu = 16
+                        await user.send_message(translations.admin_messages['send_a_voice'], keyboards.en_back)
+                    elif text == 'Deny Voice':
+                        user.database.menu = 17
+                        await user.send_message(translations.admin_messages['send_a_voice'], keyboards.en_back)
+                    elif text == 'Accept Voice':
+                        user.database.menu = 18
                         await user.send_message(translations.admin_messages['send_a_voice'], keyboards.en_back)
                 # Owner Section
                 elif user.database.rank == user.database.Rank.OWNER and text in (
@@ -453,14 +462,24 @@ async def webhook(request):
                 else:
                     await user.send_message(translations.admin_messages['ad_deleted'], keyboards.owner)
             elif user.database.menu == 16:
-                if user.voice_exists(message):
-                    if target_voice := await functions.get_vote(message['voice']['file_unique_id']):
-                        await functions.delete_vote_async(target_voice.message_id, request.http_session)
-                        await target_voice.ban_sender()
-                        user.database.menu = 1
-                        await user.send_message(translations.admin_messages['ban_voted'], keyboards.owner)
-                    else:
-                        await user.send_message(translations.admin_messages['voice_not_found'])
+                if user.voice_exists(message) and \
+                        (target_voice := await user.get_vote(message['voice']['file_unique_id'])):
+                    await functions.delete_vote_async(target_voice.message_id, request.http_session)
+                    await target_voice.ban_sender()
+                    user.database.menu = 1
+                    await user.send_message(translations.admin_messages['ban_voted'], keyboards.owner)
+            elif user.database.menu == 17:
+                if user.voice_exists(message) and \
+                        (target_voice := await user.get_vote(message['voice']['file_unique_id'])):
+                    await user.deny_voice(target_voice)
+                    user.database.menu = 1
+                    await user.send_message(translations.admin_messages['admin_voice_denied'], keyboards.owner)
+            elif user.database.menu == 18:
+                if user.voice_exists(message) and \
+                        (target_voice := await user.get_vote(message['voice']['file_unique_id'])):
+                    await user.accept_voice(target_voice)
+                    user.database.menu = 1
+                    await user.send_message(translations.admin_messages['admin_voice_accepted'], keyboards.owner)
         elif user.database.status == user.database.Status.ACTIVE and \
                 (user.database.rank == user.database.Rank.USER or
                  user.database.menu_mode == user.database.MenuMode.USER):

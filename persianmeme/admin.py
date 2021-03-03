@@ -3,6 +3,9 @@ from persianmeme import models
 from django.http import HttpResponse
 from django.core.serializers import serialize
 from persianmeme.functions import delete_vote_sync
+from django.conf import settings
+from random import randint
+change_permission = ('change',)
 
 
 def export_json(costume_admin, request, queryset):
@@ -23,6 +26,14 @@ def current_playlist(obj: models.User):
 
 def current_voice(obj: models.User):
     return obj.current_voice.name if obj.current_voice else None
+
+
+def count_deny_votes(obj: models.Voice):
+    return obj.deny_vote.count()
+
+
+def count_accept_votes(obj: models.Voice):
+    return obj.accept_vote.count()
 
 
 count_playlists.short_description = 'Playlists Count'
@@ -63,6 +74,9 @@ class User(admin.ModelAdmin):
     unban_user.short_description = 'Unban'
     full_ban.short_description = 'Full Ban'
     ban_user.short_description = 'Ban'
+    unban_user.allowed_permissions = change_permission
+    ban_user.allowed_permissions = change_permission
+    full_ban.allowed_permissions = change_permission
     date_hierarchy = 'last_usage_date'
     list_display = (
         'user_id',
@@ -79,31 +93,39 @@ class User(admin.ModelAdmin):
     )
     list_filter = ('status', 'rank', 'sent_message', 'vote', 'started', 'voice_order', 'menu_mode')
     list_per_page = 15
-    search_fields = ('user_id','chat_id', 'username')
+    search_fields = ('user_id', 'chat_id', 'username')
     readonly_fields = ('user_id', 'date', 'last_usage_date')
-    actions = [export_json, ban_user, full_ban, unban_user]
-    fieldsets = [
+    actions = (unban_user, full_ban, ban_user, export_json)
+    raw_id_fields = (
+        'private_voices',
+        'favorite_voices',
+        'last_broadcast',
+        'playlists',
+        'current_playlist',
+        'current_voice',
+        'current_ad'
+    )
+    fieldsets = (
         ('Information', {'fields': ('user_id', 'chat_id', 'rank', 'vote', 'username', 'date', 'voice_order')}),
         ('Status', {'fields': (
-            'menu', 'status', 'sent_message', 'started', 'last_usage_date', 'last_start', 'menu_mode'
-        )})
-    ]
+            'menu',
+            'status',
+            'sent_message',
+            'started',
+            'last_usage_date',
+            'last_start',
+            'menu_mode',
+            'current_playlist',
+            'current_voice',
+            'current_ad',
+            'last_broadcast'
+        )}),
+        ('Voices', {'fields': ('private_voices', 'favorite_voices', 'playlists')})
+    )
 
 
 @admin.register(models.Voice)
 class Voice(admin.ModelAdmin):
-    date_hierarchy = 'date'
-    list_display = ('voice_id', 'file_id', 'name', 'sender', 'votes', 'status')
-    list_filter = ('status', 'voice_type')
-    search_fields = ('name', 'sender__chat_id', 'file_id', 'file_unique_id', 'voice_id', 'sender__user_id')
-    actions = (export_json, 'accept_vote', 'deny_vote')
-    list_per_page = 15
-    readonly_fields = ('voice_id', 'date', 'last_check')
-    fieldsets = (
-        ('Information', {'fields': ('voice_id', 'file_id', 'name', 'file_unique_id', 'date')}),
-        ('Status', {'fields': ('status', 'votes', 'voice_type', 'last_check')})
-    )
-
     def accept_vote(self, request, queryset):
         result = [
             (target_voice, target_voice.accept(), delete_vote_sync(target_voice))
@@ -132,6 +154,48 @@ class Voice(admin.ModelAdmin):
             else:
                 self.message_user(request, f'{result_len} Voices have been denied !')
 
+    def add_fake_deny_votes(self, request, queryset):
+        if (user_count := models.User.objects.count()) < settings.MIN_FAKE_VOTE:
+            fake_min = user_count
+            fake_max = user_count
+        else:
+            fake_min = settings.MIN_FAKE_VOTE
+            if user_count < settings.MAX_FAKE_VOTE:
+                fake_max = user_count
+            else:
+                fake_max = settings.MAX_FAKE_VOTE
+        faked_count = 0
+        for voice in queryset:
+            if voice.status == voice.Status.PENDING and \
+                    voice.deny_vote.count() < (random_fake := randint(fake_min, fake_max)):
+                faked_count += 1
+                voice.deny_vote.set(models.User.objects.all()[:random_fake])
+        if faked_count == 0:
+            self.message_user(request, 'There is no need to add fake votes !')
+        elif faked_count == 1:
+            self.message_user(request, 'Fake votes have been added to a voice !')
+        else:
+            self.message_user(request, f'Fake votes has been added to {faked_count} voices !')
+
+    accept_vote.short_description = 'Accept Votes'
+    deny_vote.short_description = 'Deny Vote'
+    add_fake_deny_votes.short_description = 'Add Fake Deny Votes'
+    add_fake_deny_votes.allowed_permissions = change_permission
+    date_hierarchy = 'date'
+    list_display = ('voice_id', 'name', 'sender', 'votes', 'status', count_deny_votes, count_accept_votes)
+    list_filter = ('status', 'voice_type')
+    search_fields = ('name', 'sender__chat_id', 'file_id', 'file_unique_id', 'voice_id', 'sender__user_id')
+    actions = (export_json, accept_vote, deny_vote, add_fake_deny_votes)
+    list_per_page = 15
+    readonly_fields = ('voice_id', 'date', 'last_check')
+    raw_id_fields = ('sender', 'voters', 'accept_vote', 'deny_vote')
+    fieldsets = (
+        ('Information', {'fields': ('voice_id', 'file_id', 'name', 'file_unique_id', 'date', 'sender')}),
+        ('Status', {'fields': (
+            'status', 'votes', 'voice_type', 'last_check', 'voters', 'accept_vote', 'deny_vote'
+        )})
+    )
+
 
 @admin.register(models.Ad)
 class Ad(admin.ModelAdmin):
@@ -149,6 +213,7 @@ class Delete(admin.ModelAdmin):
     search_fields = (
         'delete_id', 'user__username', 'user__chat_id', 'voice__voice_id', 'voice__file_id', 'voice__file_unique_id'
     )
+    raw_id_fields = ('voice', 'user')
     fieldsets = (('Information', {'fields': ('delete_id', 'voice', 'user')}),)
 
 
@@ -159,7 +224,8 @@ class Broadcast(admin.ModelAdmin):
     search_fields = ('id', 'message_id', 'sender__chat_id', 'sender__username')
     list_per_page = 15
     readonly_fields = ('id',)
-    fieldsets = (('Information', {'fields': ('id', 'message_id')}), ('Status', {'fields': ('sent',)}))
+    raw_id_fields = ('sender',)
+    fieldsets = (('Information', {'fields': ('id', 'message_id', 'sender')}), ('Status', {'fields': ('sent',)}))
 
 
 @admin.register(models.Playlist)
@@ -170,4 +236,5 @@ class Playlist(admin.ModelAdmin):
     search_fields = ('name', 'id', 'creator__username', 'creator__chat_id')
     list_per_page = 15
     readonly_fields = ('id', 'date')
-    fieldsets = (('Information', {'fields': ('id', 'name', 'date')}),)
+    raw_id_fields = ('voices', 'creator')
+    fieldsets = (('Information', {'fields': ('id', 'name', 'date', 'voices', 'creator')}),)

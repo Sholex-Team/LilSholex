@@ -1,16 +1,14 @@
-from . import models
 import json
 from django.conf import settings
 from LilSholex.decorators import async_fix
 from LilSholex.classes import Base
-from . import steps
 from asgiref.sync import sync_to_async
 from aiohttp import ClientSession
 from datetime import datetime, timedelta
 from LilSholex.functions import filter_object
-from persianmeme.functions import make_like_result, make_result, paginate
+from persianmeme.functions import make_like_result, make_result, paginate, get_vote, delete_vote_async
 from enum import Enum
-from . import translations
+from . import translations, models, steps
 
 
 class User(Base):
@@ -400,3 +398,18 @@ class User(Base):
             self.database.current_ad.save()
             return True
         return False
+
+    async def get_vote(self, file_unique_id: str):
+        if not (target_voice := await get_vote(file_unique_id)):
+            await self.send_message(translations.admin_messages['voice_not_found'])
+        return target_voice
+
+    async def accept_voice(self, voice: models.Voice):
+        sender_user = await User(self._session, self.Mode.NORMAL, instance=await voice.async_accept())
+        await sender_user.send_message(translations.user_messages['voice_accepted'])
+        await delete_vote_async(voice.message_id, self._session)
+
+    async def deny_voice(self, voice: models.Voice):
+        sender_user = await User(self._session, self.Mode.NORMAL, instance=await voice.async_deny())
+        await sender_user.send_message(translations.user_messages['voice_denied'])
+        await delete_vote_async(voice.message_id, self._session)
