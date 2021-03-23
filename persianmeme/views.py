@@ -13,7 +13,6 @@ from LilSholex.functions import (
 from django.http import HttpResponse
 import json
 from aiohttp import ClientSession
-from . import translations
 from .types import ObjectType
 from django.forms import ValidationError
 
@@ -29,7 +28,7 @@ async def webhook(request):
         if not user.database.started:
             await user.save()
             await functions.answer_inline_query(
-                inline_query_id, functions.start_bot_first(), '', 0, request.http_session
+                inline_query_id, functions.start_bot_first(), '', 0, True, request.http_session
             )
             return HttpResponse(status=200)
         await user.send_ad()
@@ -38,7 +37,7 @@ async def webhook(request):
         if user.database.status != 'f':
             results, next_offset = await user.get_voices(query, offset)
             await functions.answer_inline_query(
-                inline_query_id, json.dumps(results), next_offset, 300, request.http_session
+                inline_query_id, json.dumps(results), next_offset, 300, True, request.http_session
             )
     elif 'callback_query' in update:
         answer_query = functions.answer_callback_query(request.http_session)
@@ -46,10 +45,12 @@ async def webhook(request):
         if callback_query['data'] == 'none':
             return HttpResponse(status=200)
         query_id = callback_query['id']
-        inliner = await classes.User(request.http_session, classes.User.Mode.SEND_AD, callback_query['from']['id'])
+        inliner = await classes.User(
+            request.http_session, classes.User.Mode.SEND_AD, callback_query['from']['id'], is_inline=True
+        )
         await inliner.record_audio()
         if not inliner.database.started:
-            await answer_query(query_id, translations.user_messages['start_to_use'], True)
+            await answer_query(query_id, inliner.translate('start_to_use'), True)
             await inliner.save()
             return HttpResponse(status=200)
         await inliner.send_ad()
@@ -84,9 +85,9 @@ async def webhook(request):
                 except (models.Playlist.DoesNotExist, ValueError):
                     await inliner.save()
                     return HttpResponse(status=200)
-                inliner.database.menu = 21
+                inliner.database.menu = inliner.database.Menu.USER_MANAGE_PLAYLIST
                 inliner.database.back_menu = 'manage_playlists'
-                await inliner.send_message(translations.user_messages['manage_playlist'], keyboards.manage_playlist)
+                await inliner.send_message(inliner.translate('manage_playlist'), keyboards.manage_playlist)
             else:
                 try:
                     inliner.database.current_voice = await get_related_obj(
@@ -95,45 +96,41 @@ async def webhook(request):
                 except models.Voice.DoesNotExist:
                     await inliner.save()
                     return HttpResponse(status=200)
-                inliner.database.menu = 23
+                inliner.database.menu = inliner.database.Menu.USER_MANAGE_PLAYLIST_VOICE
                 inliner.database.back_menu = 'manage_playlist'
-                await inliner.send_message(translations.user_messages['manage_voice'], keyboards.manage_voice)
-        elif callback_data[0] == 'read':
-            user = await classes.User(request.http_session, classes.User.Mode.NORMAL, callback_data[1])
-            user.database.sent_message = False
-            await user.send_message(translations.user_messages['checked_by_admin'])
+                await inliner.send_message(inliner.translate('manage_voice'), keyboards.manage_voice)
+        elif callback_data[0] in (message_options := ('read', 'ban', 'reply')):
             await inliner.delete_message(message_id)
-            await answer_query(query_id, 'Read ✅', False)
-            await user.save()
-        elif callback_data[0] == 'ban':
-            user = await classes.User(request.http_session, classes.User.Mode.NORMAL, callback_data[1])
-            user.database.sent_message = False
-            user.database.status = 'b'
-            await user.send_message(translations.user_messages['you_are_banned'])
-            await inliner.delete_message(message_id)
-            await answer_query(query_id, translations.admin_messages['banned'].format(user.database.chat_id), True)
-            await user.save()
-        elif callback_data[0] == 'reply':
-            user = await classes.User(request.http_session, classes.User.Mode.NORMAL, callback_data[1])
-            inliner.database.menu = 9
-            inliner.database.menu_mode = inliner.database.MenuMode.ADMIN
-            inliner.database.back_menu = 'chat_id'
-            inliner.database.temp_user_id = user.database.chat_id
-            await inliner.send_message(translations.admin_messages['reply'], keyboards.en_back)
-            await inliner.delete_message(message_id)
-            await answer_query(query_id, translations.admin_messages['replying'], False)
-            user.database.sent_message = False
-            await user.send_message(translations.user_messages['checked_by_admin'])
-            await user.save()
+            if not (target_message := await functions.get_message(callback_data[1])):
+                await inliner.save()
+                return HttpResponse(status=200)
+            user = await classes.User(
+                request.http_session, classes.User.Mode.NORMAL, instance=target_message.sender, is_inline=True
+            )
+            await user.send_message(user.translate('checked_by_admin'))
+            if callback_data[0] == message_options[0]:
+                await answer_query(query_id, 'Read ✅', False)
+            elif callback_data[0] == message_options[1]:
+                await user.send_message(user.translate('you_are_banned'))
+                user.database.status = user.database.Status.BANNED
+                await answer_query(query_id, inliner.translate('banned', user.database.chat_id), True)
+                await user.save()
+            elif callback_data[0] == message_options[2]:
+                inliner.database.menu = inliner.database.Menu.ADMIN_MESSAGE_USER
+                inliner.database.menu_mode = inliner.database.MenuMode.ADMIN
+                inliner.database.back_menu = 'chat_id'
+                inliner.database.temp_user_id = user.database.chat_id
+                await inliner.send_message(inliner.translate('reply'), keyboards.en_back)
+                await answer_query(query_id, inliner.translate('replying'), False)
         elif callback_data[0] in ('admin_accept', 'admin_deny'):
             if callback_data[0] == 'admin_deny':
                 if await inliner.delete_semi_active(message['voice']['file_unique_id']):
-                    await answer_query(query_id, translations.admin_messages['deleted'], False)
+                    await answer_query(query_id, inliner.translate('deleted'), False)
                 else:
-                    await answer_query(query_id, translations.admin_messages['processed_before'], False)
+                    await answer_query(query_id, inliner.translate('processed_before'), False)
             elif callback_data[0] == 'admin_accept':
                 if await functions.accept_voice(message['voice']['file_unique_id']):
-                    await answer_query(query_id, translations.admin_messages['accepted'], False)
+                    await answer_query(query_id, inliner.translate('accepted'), False)
                 else:
                     await answer_query(query_id, 'Voice has been processed before ✖️', False)
             await inliner.delete_message(message_id)
@@ -142,30 +139,30 @@ async def webhook(request):
             if not target_delete:
                 return HttpResponse(status=200)
             user = await classes.User(
-                request.http_session, classes.User.Mode.NORMAL, instance=await target_delete.get_user()
+                request.http_session, classes.User.Mode.NORMAL, instance=await target_delete.get_user(), is_inline=True
             )
             if callback_data[0] == 'delete':
                 await functions.delete_target_voice(target_delete)
-                answer_query(query_id, translations.admin_messages['deleted'], True)
-                await user.send_message(translations.user_messages['deleted'])
+                answer_query(query_id, user.translate('deleted'), True)
+                await user.send_message(user.translate('deleted'))
             elif callback_data[0] == 'delete_deny':
                 await delete_obj(target_delete)
-                answer_query(query_id, translations.admin_messages['denied'], True)
-                await user.send_message(translations.user_messages['delete_denied'])
+                answer_query(query_id, inliner.translate('denied'), True)
+                await user.send_message(user.translate('delete_denied'))
             await inliner.delete_message(message_id)
         elif callback_data[0] in ('accept', 'deny') and message.get('voice'):
             target_voice = await functions.check_voice(message['voice']['file_unique_id'])
             if target_voice:
                 if callback_data[0] == 'accept':
                     if not await inliner.like_voice(target_voice):
-                        await answer_query(query_id, translations.user_messages['vote_before'], True)
+                        await answer_query(query_id, inliner.translate('vote_before'), True)
                     else:
-                        await answer_query(query_id, translations.user_messages['voted'], False)
+                        await answer_query(query_id, inliner.translate('voted'), False)
                 else:
                     if not await inliner.dislike_voice(target_voice):
-                        await answer_query(query_id, translations.user_messages['vote_before'], True)
+                        await answer_query(query_id, inliner.translate('vote_before'), True)
                     else:
-                        await answer_query(query_id, translations.user_messages['voted'], False)
+                        await answer_query(query_id, inliner.translate('voted'), False)
                 await save_obj(target_voice)
         elif callback_data[0] in ('up', 'down'):
             try:
@@ -175,26 +172,24 @@ async def webhook(request):
                 return HttpResponse(status=200)
             if callback_data[0] == 'up':
                 if inliner.database in await voice.get_voters():
-                    await answer_query(query_id, translations.user_messages['voted_before'], True)
+                    await answer_query(query_id, inliner.translate('voted_before'), True)
                 else:
                     await inliner.add_voter(voice)
                     voice.votes += 1
                     await save_obj(voice)
-                    await answer_query(query_id, translations.user_messages['voice_voted'], False)
+                    await answer_query(query_id, inliner.translate('voice_voted'), False)
             elif callback_data[0] == 'down':
                 if inliner.database in await voice.get_voters():
                     await inliner.remove_voter(voice)
                     voice.votes -= 1
                     await save_obj(voice)
-                    await answer_query(query_id, translations.user_messages['took_vote_back'], False)
+                    await answer_query(query_id, inliner.translate('took_vote_back'), False)
                 else:
-                    await answer_query(query_id, translations.user_messages['not_voted'], True)
+                    await answer_query(query_id, inliner.translate('not_voted'), True)
         await inliner.save()
     else:
         if 'message' in update:
             message = update['message']
-        elif 'edited_message' in update:
-            message = update['edited_message']
         else:
             return HttpResponse(status=200)
         text = message.get('text', None)
@@ -211,34 +206,32 @@ async def webhook(request):
         if user.database.rank != user.database.Rank.USER:
             if text == '/admin':
                 user.database.menu_mode = user.database.MenuMode.ADMIN
-                user.database.menu = 1
-                await user.send_message(translations.admin_messages['admin_panel'], keyboards.owner, message_id)
+                user.database.menu = user.database.Menu.ADMIN_MAIN
+                await user.send_message(user.translate('admin_panel'), keyboards.owner, message_id)
                 await user.save()
                 return HttpResponse(status=200)
             elif text == '/user':
                 user.database.menu_mode = user.database.MenuMode.USER
-                user.database.menu = 1
-                await user.send_message(translations.user_messages['user_panel'], keyboards.user, message_id)
+                user.database.menu = user.database.Menu.USER_MAIN
+                await user.send_message(user.translate('user_panel'), keyboards.user, message_id)
                 await user.save()
                 return HttpResponse(status=200)
-        if user.database.rank != 'u' and user.database.menu_mode == user.database.MenuMode.ADMIN:
+        if user.database.rank != user.database.Rank.USER and user.database.menu_mode == user.database.MenuMode.ADMIN:
             if text == '/start':
-                user.database.menu = 1
-                await user.send_message(translations.admin_messages['welcome'], keyboards.owner, message_id)
-            elif user.database.menu == 1:
+                user.database.menu = user.database.Menu.ADMIN_MAIN
+                await user.send_message(user.translate('welcome'), keyboards.owner, message_id)
+            elif user.database.menu == user.database.Menu.ADMIN_MAIN:
                 user.database.back_menu = 'main'
                 # All Admins Section
                 if text == 'Add Sound':
-                    user.database.menu = 2
-                    await user.send_message(translations.admin_messages['voice_name'], keyboards.en_back)
+                    user.database.menu = user.database.Menu.ADMIN_VOICE_NAME
+                    await user.send_message(user.translate('voice_name'), keyboards.en_back)
                 elif text == 'Voice Count':
                     await user.send_message(await functions.count_voices())
                 elif text == 'Member Count':
-                    await user.send_message(
-                        translations.admin_messages['member_count'].format(await functions.count_users())
-                    )
+                    await user.send_message(user.translate('member_count', await functions.count_users()))
                 # Admins & Owner section
-                elif user.database.rank in models.BOT_ADMINS and text in (
+                elif user.database.rank in models.BOT_ADMINS and text in (admin_options := (
                     'Get User',
                     'Ban a User',
                     'Unban a User',
@@ -247,24 +240,25 @@ async def webhook(request):
                     'Accepted',
                     'Ban Vote',
                     'Accept Voice',
-                    'Deny Voice'
-                ):
-                    if text == 'Get User':
-                        user.database.menu = 12
-                        await user.send_message(translations.admin_messages['chat_id'], keyboards.en_back)
-                    elif text == 'Ban a User':
-                        user.database.menu = 5
-                        await user.send_message(translations.admin_messages['chat_id'], keyboards.en_back)
-                    elif text == 'Unban a User':
-                        user.database.menu = 6
-                        await user.send_message(translations.admin_messages['chat_id'], keyboards.en_back)
-                    elif text == 'Full Ban':
-                        user.database.menu = 7
-                        await user.send_message(translations.admin_messages['chat_id'], keyboards.en_back)
-                    elif text == 'Delete Sound':
-                        user.database.menu = 4
-                        await user.send_message(translations.admin_messages['voice'], keyboards.en_back)
-                    elif text == 'Accepted':
+                    'Deny Voice',
+                    'Get Voice'
+                )):
+                    if text == admin_options[0]:
+                        user.database.menu = user.database.Menu.ADMIN_GET_USER
+                        await user.send_message(user.translate('chat_id'), keyboards.en_back)
+                    elif text == admin_options[1]:
+                        user.database.menu = user.database.Menu.ADMIN_BAN_USER
+                        await user.send_message(user.translate('chat_id'), keyboards.en_back)
+                    elif text == admin_options[2]:
+                        user.database.menu = user.database.Menu.ADMIN_UNBAN_USER
+                        await user.send_message(user.translate('chat_id'), keyboards.en_back)
+                    elif text == admin_options[3]:
+                        user.database.menu = user.database.Menu.ADMIN_FULL_BAN_USER
+                        await user.send_message(user.translate('chat_id'), keyboards.en_back)
+                    elif text == admin_options[4]:
+                        user.database.menu = user.database.Menu.ADMIN_DELETE_VOICE
+                        await user.send_message(user.translate('voice'), keyboards.en_back)
+                    elif text == admin_options[5]:
                         if accepted_voices := await functions.get_all_accepted():
                             for voice in accepted_voices:
                                 await user.send_voice(voice.file_id, voice.name, {'inline_keyboard': [[
@@ -272,35 +266,46 @@ async def webhook(request):
                                     {'text': 'Deny', 'callback_data': 'admin_deny'}
                                 ]]})
                             await user.send_message(
-                                translations.admin_messages['accepted_voices'], reply_to_message_id=message_id
+                                user.translate('accepted_voices'), reply_to_message_id=message_id
                             )
                         else:
                             await user.send_message(
-                                translations.admin_messages['no_accepted'], reply_to_message_id=message_id
+                                user.translate('no_accepted'), reply_to_message_id=message_id
                             )
-                    elif text == 'Ban Vote':
-                        user.database.menu = 16
-                        await user.send_message(translations.admin_messages['send_a_voice'], keyboards.en_back)
-                    elif text == 'Deny Voice':
-                        user.database.menu = 17
-                        await user.send_message(translations.admin_messages['send_a_voice'], keyboards.en_back)
-                    elif text == 'Accept Voice':
-                        user.database.menu = 18
-                        await user.send_message(translations.admin_messages['send_a_voice'], keyboards.en_back)
+                    elif text == admin_options[6]:
+                        user.database.menu = user.database.Menu.ADMIN_BAN_VOTE
+                        await user.send_message(user.translate('send_a_voice'), keyboards.en_back)
+                    elif text == admin_options[7]:
+                        user.database.menu = user.database.Menu.ADMIN_ACCEPT_VOICE
+                        await user.send_message(user.translate('send_a_voice'), keyboards.en_back)
+                    elif text == admin_options[8]:
+                        user.database.menu = user.database.Menu.ADMIN_DENY_VOICE
+                        await user.send_message(user.translate('send_a_voice'), keyboards.en_back)
+                    else:
+                        user.database.menu = user.database.Menu.ADMIN_GET_VOICE
+                        await user.send_message(
+                            user.translate('send_voice_id'), keyboards.en_back
+                        )
                 # Owner Section
-                elif user.database.rank == user.database.Rank.OWNER and text in (
-                        'Message User', 'Add Ad', 'Delete Ad', 'Delete Requests', 'Broadcast', 'Edit Ad'
-                ):
-                    if text == 'Message User':
-                        user.database.menu = 8
-                        await user.send_message(translations.admin_messages['chat_id'], keyboards.en_back)
-                    elif text == 'Add Ad':
-                        user.database.menu = 10
-                        await user.send_message(translations.admin_messages['send_ad'], keyboards.en_back)
-                    elif text == 'Delete Ad':
-                        user.database.menu = 11
-                        await user.send_message(translations.admin_messages['send_ad_id'], keyboards.en_back)
-                    elif text == 'Delete Requests':
+                elif user.database.rank == user.database.Rank.OWNER and text in (owner_options := (
+                    'Message User',
+                    'Add Ad',
+                    'Delete Ad',
+                    'Delete Requests',
+                    'Broadcast',
+                    'Edit Ad',
+                    'Messages'
+                )):
+                    if text == owner_options[0]:
+                        user.database.menu = user.database.Menu.ADMIN_MESSAGE_USER_ID
+                        await user.send_message(user.translate('chat_id'), keyboards.en_back)
+                    elif text == owner_options[1]:
+                        user.database.menu = user.database.Menu.ADMIN_ADD_AD
+                        await user.send_message(user.translate('send_ad'), keyboards.en_back)
+                    elif text == owner_options[2]:
+                        user.database.menu = user.database.Menu.ADMIN_DELETE_AD
+                        await user.send_message(user.translate('send_ad_id'), keyboards.en_back)
+                    elif text == owner_options[3]:
                         delete_requests = await functions.get_delete_requests()
                         if delete_requests:
                             for delete_request in delete_requests:
@@ -310,176 +315,187 @@ async def webhook(request):
                                     keyboards.delete_voice(delete_request.delete_id)
                                 )
                             await user.send_message(
-                                translations.admin_messages['delete_requests'], reply_to_message_id=message_id
+                                user.translate('delete_requests'), reply_to_message_id=message_id
                             )
                         else:
                             await user.send_message(
-                                translations.admin_messages['no_delete_requests'], reply_to_message_id=message_id
+                                user.translate('no_delete_requests'), reply_to_message_id=message_id
                             )
-                    elif text == 'Broadcast':
-                        user.database.menu = 13
-                        await user.send_message(translations.admin_messages['broadcast'], keyboards.en_back)
-                    elif text == 'Edit Ad':
-                        user.database.menu = 14
-                        await user.send_message(translations.admin_messages['edit_ad'], keyboards.en_back)
+                    elif text == owner_options[4]:
+                        user.database.menu = user.database.Menu.ADMIN_BROADCAST
+                        await user.send_message(user.translate('broadcast'), keyboards.en_back)
+                    elif text == owner_options[5]:
+                        user.database.menu = user.database.Menu.ADMIN_EDIT_AD_ID
+                        await user.send_message(user.translate('edit_ad'), keyboards.en_back)
+                    else:
+                        await user.send_messages()
                 elif 'voice' in message:
                     search_result = await functions.get_voice(message['voice']['file_unique_id'])
                     if search_result:
                         target_voice_name = search_result.name
                         await user.send_message(
-                            translations.admin_messages['voice_info'].format(target_voice_name),
+                            user.translate('voice_info', target_voice_name),
                             keyboards.use(target_voice_name)
                         )
                     else:
-                        await user.send_message(translations.admin_messages['voice_not_found'])
+                        await user.send_message(user.translate('voice_not_found'))
                 else:
-                    await user.send_message(translations.admin_messages['unknown'])
-            elif user.database.menu == 2:
+                    await user.send_message(user.translate('unknown'))
+            elif user.database.menu == user.database.Menu.ADMIN_VOICE_NAME:
                 if text:
                     if len(text) > 50:
-                        await user.send_message(translations.admin_messages['name_limit'])
+                        await user.send_message(user.translate('name_limit'))
                     else:
-                        user.database.menu = 3
+                        user.database.menu = user.database.Menu.ADMIN_NEW_VOICE
                         user.database.temp_voice_name = text
                         user.database.back_menu = 'voice_name'
-                        await user.send_message(translations.admin_messages['voice'])
+                        await user.send_message(user.translate('voice'))
                 else:
-                    await user.send_message(translations.admin_messages['voice_name'])
-            elif user.database.menu == 3:
+                    await user.send_message(user.translate('voice_name'))
+            elif user.database.menu == user.database.Menu.ADMIN_NEW_VOICE:
                 if await user.voice_exists(message):
                     if await functions.add_voice(
                             message['voice']['file_id'],
                             message['voice']['file_unique_id'],
                             user.database.temp_voice_name,
                             user.database,
-                            'a'
+                            models.Voice.Status.ACTIVE
                     ):
-                        user.database.menu = 1
-                        await user.send_message(translations.admin_messages['voice_added'], keyboards.owner)
+                        user.database.menu = user.database.Menu.ADMIN_MAIN
+                        await user.send_message(user.translate('voice_added'), keyboards.owner)
                     else:
-                        await user.send_message(translations.admin_messages['voice_is_added'])
-            elif user.database.menu == 4:
+                        await user.send_message(user.translate('voice_is_added'))
+            elif user.database.menu == user.database.Menu.ADMIN_DELETE_VOICE:
                 if await user.voice_exists(message):
                     await user.delete_voice(message['voice']['file_unique_id'])
-                    user.database.menu = 1
-                    await user.send_message(translations.admin_messages['deleted'], keyboards.owner)
-            elif user.database.menu == 5:
+                    user.database.menu = user.database.Menu.ADMIN_MAIN
+                    await user.send_message(user.translate('deleted'), keyboards.owner)
+            elif user.database.menu == user.database.Menu.ADMIN_BAN_USER:
                 try:
                     user_id = int(text)
                 except (ValueError, TypeError):
-                    await user.send_message(translations.admin_messages['invalid_user_id'])
+                    await user.send_message(user.translate('invalid_user_id'))
                 else:
-                    user.database.menu = 1
-                    await functions.change_user_status(user_id, 'b')
+                    user.database.menu = user.database.Menu.ADMIN_MAIN
+                    await functions.change_user_status(user_id, models.User.Status.BANNED)
                     await user.send_message(
-                        translations.admin_messages['banned'].format(user_id),
+                        user.translate('banned', user_id),
                         keyboards.owner
                     )
-            elif user.database.menu == 6:
+            elif user.database.menu == user.database.Menu.ADMIN_UNBAN_USER:
                 try:
                     user_id = int(text)
                 except (ValueError, TypeError):
-                    await user.send_message(translations.admin_messages['invalid_user_id'])
+                    await user.send_message(user.translate('invalid_user_id'))
                 else:
-                    user.database.menu = 1
-                    await functions.change_user_status(user_id, 'a')
-                    await user.send_message(translations.admin_messages['unbanned'], keyboards.owner)
-            elif user.database.menu == 7:
+                    user.database.menu = user.database.Menu.ADMIN_MAIN
+                    await functions.change_user_status(user_id, models.User.Status.ACTIVE)
+                    await user.send_message(user.translate('unbanned'), keyboards.owner)
+            elif user.database.menu == user.database.Menu.ADMIN_FULL_BAN_USER:
                 try:
                     user_id = int(text)
                 except (ValueError, TypeError):
-                    await user.send_message(translations.admin_messages['invalid_user_id'])
+                    await user.send_message(user.translate('invalid_user_id'))
                 else:
-                    user.database.menu = 1
-                    await functions.change_user_status(user_id, 'f')
-                    await user.send_message(translations.admin_messages['banned'].format(user_id), keyboards.owner)
-            elif user.database.menu == 8:
+                    user.database.menu = user.database.Menu.ADMIN_MAIN
+                    await functions.change_user_status(user_id, models.User.Status.FULL_BANNED)
+                    await user.send_message(user.translate('banned', user_id), keyboards.owner)
+            elif user.database.menu == user.database.Menu.ADMIN_MESSAGE_USER_ID:
                 try:
                     user.database.temp_user_id = int(text)
                 except (ValueError, TypeError):
-                    await user.send_message(translations.admin_messages['invalid_user_id'])
+                    await user.send_message(user.translate('invalid_user_id'))
                 else:
-                    user.database.menu = 9
+                    user.database.menu = user.database.Menu.ADMIN_MESSAGE_USER
                     user.database.back_menu = 'chat_id'
-                    await user.send_message(translations.admin_messages['message'])
-            elif user.database.menu == 9:
-                user.database.menu = 1
-                await user.copy_message(user.database.temp_user_id, message_id, keyboards.admin_message)
-                await user.send_message(translations.admin_messages['sent'], keyboards.owner)
-            elif user.database.menu == 10:
-                user.database.menu = 1
+                    await user.send_message(user.translate('message'))
+            elif user.database.menu == user.database.Menu.ADMIN_MESSAGE_USER:
+                user.database.menu = user.database.Menu.ADMIN_MAIN
+                await user.copy_message(message_id, keyboards.admin_message, chat_id=user.database.temp_user_id)
+                await user.send_message(user.translate('sent'), keyboards.owner)
+            elif user.database.menu == user.database.Menu.ADMIN_ADD_AD:
+                user.database.menu = user.database.Menu.ADMIN_MAIN
                 ad_id = (await create_obj(models.Ad, chat_id=user.database.chat_id, message_id=message_id)).ad_id
                 await user.send_message(
-                    translations.admin_messages['ad_submitted'].format(ad_id), keyboards.owner
+                    user.translate('ad_submitted', ad_id), keyboards.owner
                 )
-            elif user.database.menu == 11:
+            elif user.database.menu == user.database.Menu.ADMIN_DELETE_AD:
                 try:
                     await delete_obj(await get_obj(models.Ad, ad_id=int(text)))
                 except (ValueError, models.Ad.DoesNotExist):
                     await user.send_message(
-                        translations.admin_messages['invalid_ad_id'], reply_to_message_id=message_id
+                        user.translate('invalid_ad_id'), reply_to_message_id=message_id
                     )
                 else:
-                    user.database.menu = 1
-                    await user.send_message(translations.admin_messages['ad_deleted'], keyboards.owner)
-            elif user.database.menu == 12:
+                    user.database.menu = user.database.Menu.ADMIN_MAIN
+                    await user.send_message(user.translate('ad_deleted'), keyboards.owner)
+            elif user.database.menu == user.database.Menu.ADMIN_GET_USER:
                 if text:
                     try:
                         int(text)
                     except ValueError:
                         await user.send_message(
-                            translations.admin_messages['invalid_user_id'], reply_to_message_id=message_id
+                            user.translate('invalid_user_id'), reply_to_message_id=message_id
                         )
                     else:
-                        user.database.menu = 1
+                        user.database.menu = user.database.Menu.ADMIN_MAIN
                         await user.send_message(
-                            translations.admin_messages['user_profile'].format(text),
+                            user.translate('user_profile', text),
                             keyboards.owner,
                             message_id,
                             'Markdown'
                         )
                 else:
-                    await user.send_message(translations.admin_messages['invalid_user_id'])
-            elif user.database.menu == 13:
+                    await user.send_message(user.translate('invalid_user_id'))
+            elif user.database.menu == user.database.Menu.ADMIN_BROADCAST:
                 await user.broadcast(message_id)
-                user.database.menu = 1
-                await user.send_message(translations.admin_messages['broadcast_start'], keyboards.owner)
-            elif user.database.menu == 14:
+                user.database.menu = user.database.Menu.ADMIN_MAIN
+                await user.send_message(user.translate('broadcast_start'), keyboards.owner)
+            elif user.database.menu == user.database.Menu.ADMIN_EDIT_AD_ID:
                 try:
                     await user.set_current_ad(text)
-                except (models.Ad.DoesNotExist, TypeError):
+                except (models.Ad.DoesNotExist, ValueError):
                     await user.send_message(
-                        translations.admin_messages['invalid_ad_id'], reply_to_message_id=message_id
+                        user.translate('invalid_ad_id'), reply_to_message_id=message_id
                     )
                 else:
                     user.database.back_menu = 'edit_ad'
-                    user.database.menu = 15
-                    await user.send_message(translations.admin_messages['replace_ad'], keyboards.en_back)
-            elif user.database.menu == 15:
-                user.database.menu = 1
+                    user.database.menu = user.database.Menu.ADMIN_EDIT_AD
+                    await user.send_message(user.translate('replace_ad'), keyboards.en_back)
+            elif user.database.menu == user.database.Menu.ADMIN_EDIT_AD:
+                user.database.menu = user.database.Menu.ADMIN_MAIN
                 if await user.edit_current_ad(message_id):
-                    await user.send_message(translations.admin_messages['ad_edited'], keyboards.owner)
+                    await user.send_message(user.translate('ad_edited'), keyboards.owner)
                 else:
-                    await user.send_message(translations.admin_messages['ad_deleted'], keyboards.owner)
-            elif user.database.menu == 16:
+                    await user.send_message(user.translate('ad_deleted'), keyboards.owner)
+            elif user.database.menu == user.database.Menu.ADMIN_BAN_VOTE:
                 if await user.voice_exists(message) and \
                         (target_voice := await user.get_vote(message['voice']['file_unique_id'])):
                     await functions.delete_vote_async(target_voice.message_id, request.http_session)
                     await target_voice.ban_sender()
-                    user.database.menu = 1
-                    await user.send_message(translations.admin_messages['ban_voted'], keyboards.owner)
-            elif user.database.menu == 17:
+                    user.database.menu = user.database.Menu.ADMIN_MAIN
+                    await user.send_message(user.translate('ban_voted'), keyboards.owner)
+            elif user.database.menu == user.database.Menu.ADMIN_DENY_VOICE:
                 if await user.voice_exists(message) and \
                         (target_voice := await user.get_vote(message['voice']['file_unique_id'])):
                     await user.deny_voice(target_voice)
-                    user.database.menu = 1
-                    await user.send_message(translations.admin_messages['admin_voice_denied'], keyboards.owner)
-            elif user.database.menu == 18:
+                    user.database.menu = user.database.Menu.ADMIN_MAIN
+                    await user.send_message(user.translate('admin_voice_denied'), keyboards.owner)
+            elif user.database.menu == user.database.Menu.ADMIN_ACCEPT_VOICE:
                 if await user.voice_exists(message) and \
                         (target_voice := await user.get_vote(message['voice']['file_unique_id'])):
                     await user.accept_voice(target_voice)
-                    user.database.menu = 1
-                    await user.send_message(translations.admin_messages['admin_voice_accepted'], keyboards.owner)
+                    user.database.menu = user.database.Menu.ADMIN_MAIN
+                    await user.send_message(user.translate('admin_voice_accepted'), keyboards.owner)
+            elif user.database.menu == user.database.Menu.ADMIN_GET_VOICE:
+                if search_result := await functions.get_admin_voice(text):
+                    await user.send_voice(search_result.file_id, search_result.name)
+                    user.database.menu = user.database.Menu.ADMIN_MAIN
+                    await user.send_message(
+                        user.translate('requested_voice'), keyboards.owner, message_id
+                    )
+                else:
+                    await user.send_message(user.translate('voice_not_found'))
         elif user.database.status == user.database.Status.ACTIVE and \
                 (user.database.rank == user.database.Rank.USER or
                  user.database.menu_mode == user.database.MenuMode.USER):
@@ -488,39 +504,40 @@ async def webhook(request):
                     try:
                         if result := await user.join_playlist(splinted_text[1]):
                             await user.send_message(
-                                translations.user_messages['joined_playlist'].format(result.name), keyboards.user
+                                user.translate('joined_playlist', result.name), keyboards.user
                             )
                         else:
                             await user.send_message(
-                                translations.user_messages['already_joined_playlist'], keyboards.user
+                                user.translate('already_joined_playlist'), keyboards.user
                             )
                     except (models.Playlist.DoesNotExist, ValidationError):
-                        await user.send_message(translations.user_messages['invalid_playlist'], keyboards.user)
+                        await user.send_message(user.translate('invalid_playlist'), keyboards.user)
                 else:
-                    await user.send_message(translations.user_messages['welcome'], keyboards.user)
-                user.database.menu = 1
-            elif user.database.menu == 1:
+                    await user.send_message(user.translate('welcome'), keyboards.user)
+                user.database.menu = user.database.Menu.USER_MAIN
+            elif user.database.menu == user.database.Menu.USER_MAIN:
                 user.database.back_menu = 'main'
                 if text == 'راهنما 🔰':
                     await user.send_help()
                 elif text == 'دیسکورد':
                     await user.send_message(
-                        translations.user_messages['discord'], keyboards.discord, message_id
+                        user.translate('discord'), keyboards.discord, message_id
                     )
                 elif text == 'لغو رای گیری ⏹':
                     await user.send_message(
-                        translations.user_messages['voting_voice'],
+                        user.translate('voting_voice'),
                         keyboards.per_back,
                         message_id
                     )
-                    user.database.menu = 18
+                    user.database.menu = user.database.Menu.USER_CANCEL_VOTING
+                    user.database.menu = user.database.Menu.USER_CANCEL_VOTING
                 elif text == 'حمایت مالی 💸':
                     await user.send_message(
-                        translations.user_messages['donate'], reply_to_message_id=message_id, parse_mode='Markdown'
+                        user.translate('donate'), reply_to_message_id=message_id, parse_mode='Markdown'
                     )
                 elif text == 'گروه عمومی':
                     await user.send_message(
-                        translations.user_messages['group'], keyboards.group, message_id
+                        user.translate('group'), keyboards.group, message_id
                     )
                 elif text == 'آخرین ویس ها 🆕':
                     voices_str = ''
@@ -530,21 +547,21 @@ async def webhook(request):
                         voices_str += f'⭕ {voice.name}\n'
                     await user.send_message(voices_str)
                 elif text == 'ارتباط با مدیریت 📬':
-                    if user.database.sent_message:
-                        await user.send_message(translations.user_messages['pending_message'])
+                    if await user.sent_message:
+                        await user.send_message(user.translate('pending_message'))
                     else:
-                        user.database.menu = 2
-                        await user.send_message(translations.user_messages['send_message'], keyboards.per_back)
+                        user.database.menu = user.database.Menu.USER_CONTACT_ADMIN
+                        await user.send_message(user.translate('send_message'), keyboards.per_back)
                 elif text == 'پیشنهاد ویس 🔥':
                     if await user.has_pending_voice():
-                        await user.send_message(translations.user_messages['pending_voice'])
+                        await user.send_message(user.translate('pending_voice'))
                     else:
-                        user.database.menu = 3
-                        await user.send_message(translations.user_messages['voice_name'], keyboards.per_back)
+                        user.database.menu = user.database.Menu.USER_SUGGEST_VOICE_NAME
+                        await user.send_message(user.translate('voice_name'), keyboards.per_back)
                 elif text == 'حذف ویس ❌':
-                    user.database.menu = 5
+                    user.database.menu = user.database.Menu.USER_DELETE_SUGGESTION
                     await user.send_message(
-                        translations.user_messages['delete_suggestion'], keyboards.per_back
+                        user.translate('delete_suggestion'), keyboards.per_back
                     )
                 elif text == 'ویس های محبوب 👌':
                     voices_str = ''
@@ -552,55 +569,52 @@ async def webhook(request):
                         voices_str += f'⭕ {voice.name}\n'
                     await user.send_message(voices_str)
                 elif text == 'امتیازدهی ⭐':
-                    user.database.menu = 6
-                    await user.send_message(translations.user_messages['choose'], keyboards.toggle)
+                    user.database.menu = user.database.Menu.USER_RANKING
+                    await user.send_message(user.translate('choose'), keyboards.toggle)
                 elif text == 'مرتب سازی 🗂':
-                    user.database.menu = 7
-                    await user.send_message(translations.user_messages['select_order'], keyboards.voice_order)
+                    user.database.menu = user.database.Menu.USER_SORTING
+                    await user.send_message(user.translate('select_order'), keyboards.voice_order)
                 elif text == 'درخواست حذف ویس ✖':
                     if await exists_obj(user.database.deletes_user):
-                        await user.send_message(translations.user_messages['pending_request'])
+                        await user.send_message(user.translate('pending_request'))
                     else:
-                        user.database.menu = 8
-                        await user.send_message(translations.user_messages['voice'], keyboards.per_back)
+                        user.database.menu = user.database.Menu.USER_DELETE_REQUEST
+                        await user.send_message(user.translate('voice'), keyboards.per_back)
                 elif text == 'ویس های شخصی 🔒':
-                    user.database.menu = 11
-                    await user.send_message(translations.user_messages['choices'], keyboards.private)
+                    user.database.menu = user.database.Menu.USER_PRIVATE_VOICES
+                    await user.send_message(user.translate('choices'), keyboards.private)
                 elif text == 'علاقه مندی ها ❤️':
-                    user.database.menu = 15
-                    await user.send_message(translations.user_messages['choices'], keyboards.private)
+                    user.database.menu = user.database.Menu.USER_FAVORITE_VOICES
+                    await user.send_message(user.translate('choices'), keyboards.private)
                 elif text == 'پلی لیست ▶️':
-                    user.database.menu = 19
-                    await user.send_message(translations.user_messages['manage_playlists'], keyboards.manage_playlists)
+                    user.database.menu = user.database.Menu.USER_PLAYLISTS
+                    await user.send_message(user.translate('manage_playlists'), keyboards.manage_playlists)
                 elif 'voice' in message:
-                    search_result = await functions.get_voice(message['voice']['file_unique_id'])
-                    if search_result:
+                    if search_result := await functions.get_voice(message['voice']['file_unique_id']):
                         await user.send_message(
-                            translations.user_messages['voice_info'].format(search_result.name),
+                            user.translate('voice_info', search_result.name),
                             keyboards.use(search_result.name)
                         )
                     else:
-                        await user.send_message(translations.user_messages['voice_not_found'])
+                        await user.send_message(user.translate('voice_not_found'))
                 else:
-                    await user.send_message(translations.user_messages['unknown_command'])
-            elif user.database.menu == 2:
-                user.database.menu = 1
-                owner = await functions.get_owner()
-                await user.copy_message(owner.chat_id, message_id, keyboards.message(user.database.chat_id))
-                user.database.sent_message = True
-                await user.send_message(translations.user_messages['message_sent'], keyboards.user, message_id)
-            elif user.database.menu == 3:
+                    await user.send_message(user.translate('unknown_command'))
+            elif user.database.menu == user.database.Menu.USER_CONTACT_ADMIN:
+                user.database.menu = user.database.Menu.USER_MAIN
+                await user.contact_admin(message_id)
+                await user.send_message(user.translate('message_sent'), keyboards.user, message_id)
+            elif user.database.menu == user.database.Menu.USER_SUGGEST_VOICE_NAME:
                 if text:
                     if message.get('entities') or len(text) > 50:
-                        await user.send_message(translations.user_messages['invalid_voice_name'])
+                        await user.send_message(user.translate('invalid_voice_name'))
                     else:
-                        user.database.menu = 4
+                        user.database.menu = user.database.Menu.USER_SUGGEST_VOICE
                         user.database.temp_voice_name = text
                         user.database.back_menu = 'suggest_name'
-                        await user.send_message(translations.user_messages['send_voice'])
+                        await user.send_message(user.translate('send_voice'))
                 else:
-                    await user.send_message(translations.user_messages['invalid_voice_name'])
-            elif user.database.menu == 4:
+                    await user.send_message(user.translate('invalid_voice_name'))
+            elif user.database.menu == user.database.Menu.USER_SUGGEST_VOICE:
                 if await user.voice_exists(message):
                     target_voice = await functions.add_voice(
                         message['voice']['file_id'],
@@ -610,57 +624,57 @@ async def webhook(request):
                         'p'
                     )
                     if target_voice:
-                        user.database.menu = 1
+                        user.database.menu = user.database.Menu.USER_MAIN
                         target_voice.message_id = await target_voice.send_voice(request.http_session)
                         await create_task(tasks.check_voice, target_voice.voice_id)
                         await create_task(tasks.update_votes, target_voice.voice_id)
                         await user.send_message(
-                            translations.user_messages['suggestion_sent'],
+                            user.translate('suggestion_sent'),
                             keyboards.user
                         )
                         await save_obj(target_voice)
                     else:
                         await user.send_message(
-                            translations.user_messages['voice_exists'], reply_to_message_id=message_id
+                            user.translate('voice_exists'), reply_to_message_id=message_id
                         )
-            elif user.database.menu == 5:
+            elif user.database.menu == user.database.Menu.USER_DELETE_SUGGESTION:
                 if await user.voice_exists(message):
                     if await user.remove_voice(message['voice']['file_unique_id']):
-                        user.database.menu = 1
-                        await user.send_message(translations.user_messages['voice_deleted'], keyboards.user)
+                        user.database.menu = user.database.Menu.USER_MAIN
+                        await user.send_message(user.translate('voice_deleted'), keyboards.user)
                     else:
-                        await user.send_message(translations.user_messages['voice_is_not_yours'])
-            elif user.database.menu == 6:
+                        await user.send_message(user.translate('voice_is_not_yours'))
+            elif user.database.menu == user.database.Menu.USER_RANKING:
                 if text == 'روشن 🔛':
                     user.database.vote = True
-                    user.database.menu = 1
-                    await user.send_message(translations.user_messages['voting_on'], keyboards.user)
+                    user.database.menu = user.database.Menu.USER_MAIN
+                    await user.send_message(user.translate('voting_on'), keyboards.user)
                 elif text == 'خاموش 🔴':
                     user.database.vote = False
-                    user.database.menu = 1
-                    await user.send_message(translations.user_messages['voting_off'], keyboards.user)
+                    user.database.menu = user.database.Menu.USER_MAIN
+                    await user.send_message(user.translate('voting_off'), keyboards.user)
                 else:
-                    await user.send_message(translations.user_messages['unknown_command'])
-            elif user.database.menu == 7:
+                    await user.send_message(user.translate('unknown_command'))
+            elif user.database.menu == user.database.Menu.USER_SORTING:
                 if text == 'جدید به قدیم':
                     user.database.voice_order = '-voice_id'
-                    user.database.menu = 1
-                    await user.send_message(translations.user_messages['ordering_changed'], keyboards.user)
+                    user.database.menu = user.database.Menu.USER_MAIN
+                    await user.send_message(user.translate('ordering_changed'), keyboards.user)
                 elif text == 'قدیم به جدید':
                     user.database.voice_order = 'voice_id'
-                    user.database.menu = 1
-                    await user.send_message(translations.user_messages['ordering_changed'], keyboards.user)
+                    user.database.menu = user.database.Menu.USER_MAIN
+                    await user.send_message(user.translate('ordering_changed'), keyboards.user)
                 elif text == 'بهترین به بدترین':
                     user.database.voice_order = '-votes'
-                    user.database.menu = 1
-                    await user.send_message(translations.user_messages['ordering_changed'], keyboards.user)
+                    user.database.menu = user.database.Menu.USER_MAIN
+                    await user.send_message(user.translate('ordering_changed'), keyboards.user)
                 elif text == 'بدترین به بهترین':
                     user.database.voice_order = 'votes'
-                    user.database.menu = 1
-                    await user.send_message(translations.user_messages['ordering_changed'], keyboards.user)
+                    user.database.menu = user.database.Menu.USER_MAIN
+                    await user.send_message(user.translate('ordering_changed'), keyboards.user)
                 else:
-                    await user.send_message(translations.user_messages['unknown_command'])
-            elif user.database.menu == 8:
+                    await user.send_message(user.translate('unknown_command'))
+            elif user.database.menu == user.database.Menu.USER_DELETE_REQUEST:
                 if await user.voice_exists(message):
                     target_voice = await functions.get_voice(
                         message['voice']['file_unique_id']
@@ -669,117 +683,117 @@ async def webhook(request):
                         owner = await classes.User(
                             request.http_session, classes.User.Mode.NORMAL, instance=await functions.get_owner()
                         )
-                        user.database.menu = 1
+                        user.database.menu = user.database.Menu.USER_MAIN
                         await user.send_message(
-                            translations.user_messages['request_created'], keyboards.user, message_id
+                            user.translate('request_created'), keyboards.user, message_id
                         )
                         await user.delete_request(target_voice)
                         await owner.send_message('New delete request 🗑')
                     else:
-                        await user.send_message(translations.user_messages['voice_not_found'])
-            elif user.database.menu == 11:
+                        await user.send_message(user.translate('voice_not_found'))
+            elif user.database.menu == user.database.Menu.USER_PRIVATE_VOICES:
                 if text == 'افزودن ⏬':
                     if await user.private_user_count() <= 60:
-                        user.database.menu = 12
+                        user.database.menu = user.database.Menu.USER_PRIVATE_VOICE_NAME
                         user.database.back_menu = 'private'
-                        await user.send_message(translations.user_messages['voice_name'], keyboards.per_back)
+                        await user.send_message(user.translate('voice_name'), keyboards.per_back)
                     else:
-                        await user.send_message(translations.user_messages['voice_limit'])
+                        await user.send_message(user.translate('voice_limit'))
                 elif text == 'حذف 🗑':
-                    user.database.menu = 13
+                    user.database.menu = user.database.Menu.USER_DELETE_PRIVATE_VOICE
                     user.database.back_menu = 'private'
-                    await user.send_message(translations.user_messages['send_voice'], keyboards.per_back)
+                    await user.send_message(user.translate('send_voice'), keyboards.per_back)
                 else:
-                    await user.send_message(translations.user_messages['unknown_command'])
-            elif user.database.menu == 12:
+                    await user.send_message(user.translate('unknown_command'))
+            elif user.database.menu == user.database.Menu.USER_PRIVATE_VOICE_NAME:
                 if text:
                     if len(text) > 50:
-                        await user.send_message(translations.user_messages['invalid_voice_name'])
+                        await user.send_message(user.translate('invalid_voice_name'))
                     else:
                         user.database.temp_voice_name = text
-                        user.database.menu = 14
+                        user.database.menu = user.database.Menu.USER_PRIVATE_VOICE
                         user.database.back_menu = 'private_name'
-                        await user.send_message(translations.user_messages['send_voice'])
+                        await user.send_message(user.translate('send_voice'))
                 else:
-                    await user.send_message(translations.user_messages['invalid_voice_name'])
-            elif user.database.menu == 13:
+                    await user.send_message(user.translate('invalid_voice_name'))
+            elif user.database.menu == user.database.Menu.USER_DELETE_PRIVATE_VOICE:
                 if await user.voice_exists(message):
                     current_voice = await functions.get_voice(
                         message['voice']['file_unique_id'], voice_type='p'
                     )
                     if current_voice:
                         if await user.delete_private_voice(current_voice):
-                            user.database.menu = 11
+                            user.database.menu = user.database.Menu.USER_PRIVATE_VOICES
                             user.database.back_menu = 'main'
-                            await user.send_message(translations.user_messages['voice_deleted'], keyboards.private)
+                            await user.send_message(user.translate('voice_deleted'), keyboards.private)
                         else:
-                            await user.send_message(translations.user_messages['voice_is_not_yours'])
+                            await user.send_message(user.translate('voice_is_not_yours'))
                     else:
-                        await user.send_message(translations.user_messages['voice_not_found'])
-            elif user.database.menu == 14:
+                        await user.send_message(user.translate('voice_not_found'))
+            elif user.database.menu == user.database.Menu.USER_PRIVATE_VOICE:
                 if await user.voice_exists(message):
                     if not await functions.get_voice(message['voice']['file_unique_id']):
                         await user.create_private_voice(message)
-                        user.database.menu = 11
+                        user.database.menu = user.database.Menu.USER_PRIVATE_VOICES
                         user.database.back_menu = 'main'
                         await user.send_message('این ویس به لیست ویس های شما اضافه شد ✅', keyboards.private)
                     else:
                         await user.send_message('این ویس در ربات موجود است ❌')
-            elif user.database.menu == 15:
+            elif user.database.menu == user.database.Menu.USER_FAVORITE_VOICES:
                 if text == 'افزودن ⏬':
                     if await user.count_favorite_voices() <= 30:
-                        user.database.menu = 16
+                        user.database.menu = user.database.Menu.USER_FAVORITE_VOICE
                         user.database.back_menu = 'favorite'
-                        await user.send_message(translations.user_messages['send_voice'], keyboards.per_back)
+                        await user.send_message(user.translate('send_voice'), keyboards.per_back)
                     else:
-                        await user.send_message(translations.user_messages['voice_limit'])
+                        await user.send_message(user.translate('voice_limit'))
                 elif text == 'حذف 🗑':
-                    user.database.menu = 17
+                    user.database.menu = user.database.Menu.USER_DELETE_FAVORITE_VOICE
                     user.database.back_menu = 'favorite'
-                    await user.send_message(translations.user_messages['send_voice'], keyboards.per_back)
+                    await user.send_message(user.translate('send_voice'), keyboards.per_back)
                 else:
-                    await user.send_message(translations.user_messages['unknown_command'])
-            elif user.database.menu == 16:
+                    await user.send_message(user.translate('unknown_command'))
+            elif user.database.menu == user.database.Menu.USER_FAVORITE_VOICE:
                 if await user.voice_exists(message):
                     current_voice = await functions.get_voice(message['voice']['file_unique_id'])
                     if current_voice:
                         if await user.add_favorite_voice(current_voice):
-                            user.database.menu = 15
+                            user.database.menu = user.database.Menu.USER_FAVORITE_VOICES
                             user.database.back_menu = 'main'
                             await user.send_message(
-                                translations.user_messages['added_to_favorite'],
+                                user.translate('added_to_favorite'),
                                 keyboards.private
                             )
                         else:
-                            await user.send_message(translations.user_messages['voice_exists_in_list'])
+                            await user.send_message(user.translate('voice_exists_in_list'))
                     else:
-                        await user.send_message(translations.user_messages['voice_not_found'])
-            elif user.database.menu == 17:
+                        await user.send_message(user.translate('voice_not_found'))
+            elif user.database.menu == user.database.Menu.USER_DELETE_FAVORITE_VOICE:
                 if await user.voice_exists(message):
                     current_voice = await functions.get_voice(message['voice']['file_unique_id'])
                     if current_voice:
                         await user.delete_favorite_voice(current_voice)
-                        user.database.menu = 15
+                        user.database.menu = user.database.Menu.USER_FAVORITE_VOICES
                         user.database.back_menu = 'main'
-                        await user.send_message(translations.user_messages['deleted_from_list'], keyboards.private)
+                        await user.send_message(user.translate('deleted_from_list'), keyboards.private)
                     else:
-                        await user.send_message(translations.user_messages['voice_not_found'])
-            elif user.database.menu == 18:
+                        await user.send_message(user.translate('voice_not_found'))
+            elif user.database.menu == user.database.Menu.USER_CANCEL_VOTING:
                 if await user.voice_exists(message):
                     if await user.cancel_voting(message['voice']['file_unique_id']):
-                        user.database.menu = 1
+                        user.database.menu = user.database.Menu.USER_MAIN
                         await user.send_message(
-                            translations.user_messages['voting_canceled'], keyboards.user, message_id
+                            user.translate('voting_canceled'), keyboards.user, message_id
                         )
                     else:
                         await user.send_message(
-                            translations.user_messages['voice_not_found'], reply_to_message_id=message_id
+                            user.translate('voice_not_found'), reply_to_message_id=message_id
                         )
-            elif user.database.menu == 19:
+            elif user.database.menu == user.database.Menu.USER_PLAYLISTS:
                 if text == 'ایجاد پلی لیست 🆕':
                     user.database.back_menu = 'manage_playlists'
-                    user.database.menu = 20
-                    await user.send_message(translations.user_messages['playlist_name'], keyboards.per_back)
+                    user.database.menu = user.database.Menu.USER_CREATE_PLAYLIST
+                    await user.send_message(user.translate('playlist_name'), keyboards.per_back)
                 elif text == 'مشاهده پلی لیست ها 📝':
                     current_page, prev_page, next_page = await user.get_playlists(1)
                     if current_page:
@@ -789,31 +803,29 @@ async def webhook(request):
                         )
                     else:
                         await user.send_message(
-                            translations.user_messages['no_playlist'], reply_to_message_id=message_id
+                            user.translate('no_playlist'), reply_to_message_id=message_id
                         )
                 else:
-                    await user.send_message(translations.user_messages['unknown_command'])
-            elif user.database.menu == 20:
+                    await user.send_message(user.translate('unknown_command'))
+            elif user.database.menu == user.database.Menu.USER_CREATE_PLAYLIST:
                 if text and len(text) <= 60:
                     await user.send_message(
-                        translations.user_messages['playlist_created'].format(
-                            (await user.create_playlist(text)).get_link()
-                        )
+                        user.translate('playlist_created', (await user.create_playlist(text)).get_link())
                     )
                     await user.go_back()
                 else:
                     await user.send_message(
-                        translations.user_messages['invalid_playlist_name'], reply_to_message_id=message_id
+                        user.translate('invalid_playlist_name'), reply_to_message_id=message_id
                     )
-            elif user.database.menu == 21:
+            elif user.database.menu == user.database.Menu.USER_MANAGE_PLAYLIST:
                 if text == 'افزودن ویس ⏬':
-                    user.database.menu = 22
+                    user.database.menu = user.database.Menu.USER_ADD_VOICE_PLAYLIST
                     user.database.back_menu = 'manage_playlist'
-                    await user.send_message(translations.user_messages['send_private_voice'], keyboards.per_back)
+                    await user.send_message(user.translate('send_private_voice'), keyboards.per_back)
                 elif text == 'حذف پلی لیست ❌':
                     await user.delete_playlist()
                     await user.send_message(
-                        translations.user_messages['playlist_deleted'], reply_to_message_id=message_id
+                        user.translate('playlist_deleted'), reply_to_message_id=message_id
                     )
                     await user.go_back()
                 elif text == 'مشاهده ی ویس ها 📝':
@@ -825,39 +837,37 @@ async def webhook(request):
                         )
                     else:
                         await user.send_message(
-                            translations.user_messages['empty_playlist'], reply_to_message_id=message_id
+                            user.translate('empty_playlist'), reply_to_message_id=message_id
                         )
                 elif text == 'لینک دعوت 🔗':
-                    await user.send_message(translations.user_messages['playlist_link'].format(
-                        await user.playlist_name, await user.playlist_link
-                    ))
-                elif text == 'مشترکین پلی لیست 👥':
                     await user.send_message(
-                        translations.user_messages['playlist_users_count'].format(await user.playlist_users)
+                        user.translate('playlist_link', await user.playlist_name, await user.playlist_link)
                     )
+                elif text == 'مشترکین پلی لیست 👥':
+                    await user.send_message(user.translate('playlist_users_count', await user.playlist_users))
                 else:
-                    await user.send_message(translations.user_messages['unknown_command'])
-            elif user.database.menu == 22:
+                    await user.send_message(user.translate('unknown_command'))
+            elif user.database.menu == user.database.Menu.USER_ADD_VOICE_PLAYLIST:
                 if await user.voice_exists(message):
                     if await user.add_voice_to_playlist(message['voice']['file_unique_id']):
-                        await user.send_message(translations.user_messages['added_to_playlist'])
+                        await user.send_message(user.translate('added_to_playlist'))
                         await user.go_back()
                     else:
                         await user.send_message(
-                            translations.user_messages['voice_is_not_yours'], reply_to_message_id=message_id
+                            user.translate('voice_is_not_yours'), reply_to_message_id=message_id
                         )
-            elif user.database.menu == 23:
+            elif user.database.menu == user.database.Menu.USER_MANAGE_PLAYLIST_VOICE:
                 if text == 'حذف ویس ❌':
                     if await user.remove_voice_from_playlist():
-                        await user.send_message(translations.user_messages['deleted_from_playlist'])
+                        await user.send_message(user.translate('deleted_from_playlist'))
                     else:
-                        await user.send_message(translations.user_messages['not_in_playlist'])
+                        await user.send_message(user.translate('not_in_playlist'))
                     await user.go_back()
                 elif text == 'گوش دادن به ویس 🎧':
                     file_id, name = await user.voice_info
                     await user.send_voice(file_id, name)
                 else:
-                    await user.send_message(translations.user_messages['unknown_command'])
+                    await user.send_message(user.translate('unknown_command'))
         await user.save()
     return HttpResponse(status=200)
 

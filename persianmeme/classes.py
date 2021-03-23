@@ -6,18 +6,41 @@ from asgiref.sync import sync_to_async
 from aiohttp import ClientSession
 from datetime import datetime, timedelta
 from LilSholex.functions import filter_object
-from persianmeme.functions import make_like_result, make_result, paginate, get_vote, delete_vote_async
+from persianmeme.functions import (
+    make_like_result, make_result, paginate, get_vote, delete_vote_async, get_contact_admin_messages
+)
 from enum import Enum
 from . import translations, models, steps
+from typing import Union
+from .keyboards import message as message_keyboard, manage_message
 
 
 class User(Base):
     _BASE_URL = f'https://api.telegram.org/bot{settings.MEME}/'
     __ads: tuple
+    __enforced_rank: Union[models.User.Rank, None]
+    __is_inline: bool
 
     class Mode(Enum):
         NORMAL = 0
         SEND_AD = 1
+
+    def __init__(
+            self,
+            session: ClientSession,
+            mode: Mode,
+            chat_id: int = None,
+            instance: models.User = None,
+            is_inline: bool = False
+    ):
+        self.__mode = mode
+        self.__is_inline = is_inline
+        super().__init__(settings.MEME, chat_id, instance, session)
+
+    def __await__(self):
+        yield from super().__await__()
+        self.__enforced_rank = self.database.rank if self.__is_inline else None
+        return self
 
     @sync_to_async
     def broadcast(self, message_id: int):
@@ -29,10 +52,6 @@ class User(Base):
         if self.__mode == self.Mode.SEND_AD:
             self.__ads = tuple(models.Ad.objects.exclude(seen=result[0]))
         return result
-
-    def __init__(self, session: ClientSession, mode: Mode, chat_id: int = None, instance: models.User = None):
-        self.__mode = mode
-        super().__init__(settings.MEME, chat_id, instance, session)
 
     @sync_to_async
     def delete_semi_active(self, file_unique_id: str):
@@ -106,22 +125,24 @@ class User(Base):
             return
 
     @async_fix
-    async def copy_message(self, chat_id: int, message_id: int, reply_markup: dict = ''):
+    async def copy_message(
+            self, message_id: int, reply_markup: dict = '', from_chat_id: int = None,  chat_id: int = None
+    ):
+        assert chat_id or from_chat_id, 'You must use a chat_id or a from_chat_id !'
         if reply_markup:
             reply_markup = json.dumps(reply_markup)
+        base_param = {'message_id': message_id, 'reply_markup': reply_markup}
         async with self._session.get(
             f'{self._BASE_URL}copyMessage',
             params={
-                **self._BASE_PARAM,
                 'from_chat_id': self.database.chat_id,
                 'chat_id': chat_id,
-                'message_id': message_id,
-                'reply_markup': reply_markup
-            }
+                **base_param
+            } if not from_chat_id else {'from_chat_id': from_chat_id, 'chat_id': self.database.chat_id, **base_param}
         ) as result:
-            if result.status != 200 or not (await result.json())['ok']:
-                return False
-            return True
+            if result.status == 200 and (result := await result.json())['ok']:
+                return result['result']['message_id']
+            return False
 
     @sync_to_async
     def __save_ad(self, ad: models.Ad):
@@ -265,8 +286,10 @@ class User(Base):
 
     async def send_help(self):
         async with self._session.get(
-            f'{self._BASE_URL}sendVideo',
-            params={**self._BASE_PARAM, 'video': settings.MEME_ANIM, 'caption': translations.user_messages['help_gif']}
+            f'{self._BASE_URL}sendAnimation',
+            params={
+                **self._BASE_PARAM, 'animation': settings.MEME_ANIM, 'caption': self.translate('help_gif')
+            }
         ) as _:
             return
 
@@ -310,9 +333,9 @@ class User(Base):
         if 'voice' in message and ('mime_type' not in message['voice'] or message['voice']['mime_type'] == 'audio/ogg'):
             return True
         if self.database.rank == models.User.Rank.USER:
-            await self.send_message(translations.user_messages['send_a_voice'])
+            await self.send_message(self.translate('send_a_voice'))
         else:
-            await self.send_message(translations.admin_messages['send_a_voice'])
+            await self.send_message(self.translate('send_a_voice'))
 
     @sync_to_async
     def get_playlists(self, page: int):
@@ -401,15 +424,46 @@ class User(Base):
 
     async def get_vote(self, file_unique_id: str):
         if not (target_voice := await get_vote(file_unique_id)):
-            await self.send_message(translations.admin_messages['voice_not_found'])
+            await self.send_message(self.translate('voice_not_found'))
         return target_voice
 
     async def accept_voice(self, voice: models.Voice):
         sender_user = await User(self._session, self.Mode.NORMAL, instance=await voice.async_accept())
-        await sender_user.send_message(translations.user_messages['voice_accepted'])
+        await sender_user.send_message(self.translate('voice_accepted'))
         await delete_vote_async(voice.message_id, self._session)
 
     async def deny_voice(self, voice: models.Voice):
         sender_user = await User(self._session, self.Mode.NORMAL, instance=await voice.async_deny())
-        await sender_user.send_message(translations.user_messages['voice_denied'])
+        await sender_user.send_message(self.translate('voice_denied'))
         await delete_vote_async(voice.message_id, self._session)
+
+    @property
+    @sync_to_async
+    def sent_message(self):
+        return models.Message.objects.filter(sender=self.database, status=models.Message.Status.PENDING).exists()
+
+    @sync_to_async
+    def _create_message(self, message_id: int):
+        models.Message.objects.create(sender=self.database, message_id=message_id)
+
+    async def contact_admin(self, message_id: int):
+        if new_message_id := await self.copy_message(
+                message_id, message_keyboard(self.database.chat_id), chat_id=settings.MEME_MESSAGES
+        ):
+            await self._create_message(new_message_id)
+
+    async def send_messages(self):
+        if messages := await get_contact_admin_messages():
+            for message in messages:
+                await self.copy_message(
+                    message.message_id, manage_message(message), from_chat_id=settings.MEME_MESSAGES
+                )
+            await self.send_message(self.translate('messages'))
+            return
+        await self.send_message(self.translate('no_message'))
+
+    def translate(self, key: str, *formatting_args):
+        return (translations.user_messages[key] if (
+            (self.__enforced_rank == self.database.Rank.USER) or
+            (self.__enforced_rank not in models.BOT_ADMINS and self.database.menu_mode == self.database.MenuMode.USER)
+        ) else translations.admin_messages[key]).format(*formatting_args)

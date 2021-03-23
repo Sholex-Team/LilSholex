@@ -12,11 +12,12 @@ numbers = {
 }
 owner = {'keyboard': [
     ['Add Sound', 'Delete Sound', 'Voice Count', 'Member Count'],
-    ['Ban a User', 'Edit Ad', 'Ban Vote'],
-    ['Unban a User', 'Full Ban', 'Message User'],
-    ['Get User', 'Broadcast', 'Accepted'],
-    ['Add Ad', 'Delete Ad', 'Delete Requests'],
-    ['Accept Voice', 'Deny Voice']
+    ['Ban a User', 'Unban a User', 'Full Ban'],
+    ['Broadcast', 'Message User'],
+    ['Get Voice', 'Get User'],
+    ['Add Ad', 'Delete Ad', 'Edit Ad'],
+    ['Accept Voice', 'Ban Vote', 'Deny Voice'],
+    ['Messages', 'Accepted', 'Delete Requests']
 ], 'resize_keyboard': True}
 user = {'keyboard': [
     ['لغو رای گیری ⏹'],
@@ -62,13 +63,17 @@ def voice(accept_count: int = 0, deny_count: int = 0):
 
 
 def message(chat_id):
+    return {'inline_keyboard': [[{'text': f'From : {chat_id}', 'callback_data': 'none'}]]}
+
+
+def manage_message(target_message):
     return {'inline_keyboard': [
-        [{'text': f'From : {chat_id}', 'callback_data': 'none'}],
+        [{'text': f'From : {target_message.sender.chat_id}', 'callback_data': 'none'}],
         [
-            {'text': 'Read', 'callback_data': f'read:{chat_id}'},
-            {'text': 'Ban', 'callback_data': f'ban:{chat_id}'}
+            {'text': 'Read', 'callback_data': f'read:{target_message.id}'},
+            {'text': 'Ban', 'callback_data': f'ban:{target_message.id}'}
         ],
-        [{'text': 'Reply', 'callback_data': f'reply:{chat_id}'}]
+        [{'text': 'Reply', 'callback_data': f'reply:{target_message.id}'}]
     ]}
 
 

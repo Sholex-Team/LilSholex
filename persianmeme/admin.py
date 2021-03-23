@@ -36,10 +36,16 @@ def count_accept_votes(obj: models.Voice):
     return obj.accept_vote.count()
 
 
+def count_tags(obj: models.Voice):
+    return obj.tags.count()
+
+
 count_playlists.short_description = 'Playlists Count'
 export_json.short_description = 'Export as Json'
 count_voices.short_description = 'Voices Count'
-current_playlist.short_description = 'Current Playlist'
+count_deny_votes.short_description = 'Deny Votes Count'
+count_accept_votes.short_description = 'Accept Votes Count'
+count_tags.short_description = 'Tags Count'
 
 
 @admin.register(models.User)
@@ -91,7 +97,7 @@ class User(admin.ModelAdmin):
         current_playlist,
         current_voice
     )
-    list_filter = ('status', 'rank', 'sent_message', 'vote', 'started', 'voice_order', 'menu_mode')
+    list_filter = ('status', 'rank', 'vote', 'started', 'voice_order', 'menu_mode')
     list_per_page = 15
     search_fields = ('user_id', 'chat_id', 'username')
     readonly_fields = ('user_id', 'date', 'last_usage_date')
@@ -110,7 +116,6 @@ class User(admin.ModelAdmin):
         ('Status', {'fields': (
             'menu',
             'status',
-            'sent_message',
             'started',
             'last_usage_date',
             'last_start',
@@ -182,15 +187,15 @@ class Voice(admin.ModelAdmin):
     add_fake_deny_votes.short_description = 'Add Fake Deny Votes'
     add_fake_deny_votes.allowed_permissions = change_permission
     date_hierarchy = 'date'
-    list_display = ('voice_id', 'name', 'sender', 'votes', 'status', count_deny_votes, count_accept_votes)
+    list_display = ('voice_id', 'name', 'sender', 'votes', 'status', count_deny_votes, count_accept_votes, count_tags)
     list_filter = ('status', 'voice_type')
     search_fields = ('name', 'sender__chat_id', 'file_id', 'file_unique_id', 'voice_id', 'sender__user_id')
     actions = (export_json, accept_vote, deny_vote, add_fake_deny_votes)
     list_per_page = 15
     readonly_fields = ('voice_id', 'date', 'last_check')
-    raw_id_fields = ('sender', 'voters', 'accept_vote', 'deny_vote')
+    raw_id_fields = ('sender', 'voters', 'accept_vote', 'deny_vote', 'tags')
     fieldsets = (
-        ('Information', {'fields': ('voice_id', 'file_id', 'name', 'file_unique_id', 'date', 'sender')}),
+        ('Information', {'fields': ('voice_id', 'file_id', 'name', 'file_unique_id', 'date', 'sender', 'tags')}),
         ('Status', {'fields': (
             'status', 'votes', 'voice_type', 'last_check', 'voters', 'accept_vote', 'deny_vote'
         )})
@@ -238,3 +243,22 @@ class Playlist(admin.ModelAdmin):
     readonly_fields = ('id', 'date')
     raw_id_fields = ('voices', 'creator')
     fieldsets = (('Information', {'fields': ('id', 'name', 'date', 'voices', 'creator')}),)
+
+
+@admin.register(models.Message)
+class Message(admin.ModelAdmin):
+    list_display = ('id', 'sender', 'status')
+    list_filter = ('status',)
+    raw_id_fields = ('sender',)
+    search_fields = ('id', 'sender__username', 'sender__user_id', 'sender__chat_id')
+    list_per_page = 15
+    readonly_fields = ('id',)
+    fieldsets = (('Information', {'fields': ('id', 'sender')}), ('Status', {'fields': ('status',)}))
+
+
+@admin.register(models.VoiceTag)
+class VoiceTag(admin.ModelAdmin):
+    list_display = ('tag',)
+    search_fields = ('tag',)
+    list_per_page = 15
+    fieldsets = (('Information', {'fields': ('tag',)}),)

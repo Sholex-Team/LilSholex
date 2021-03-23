@@ -17,6 +17,8 @@ admin_messages = {
     'send_ad': 'Please send the ad message.',
     'send_ad_id': 'Please send the ad ID.',
     'delete_requests': 'Here are delete requests 👆',
+    'messages': 'Here are messages 👆',
+    'no_message': 'There is no message !',
     'no_delete_requests': 'There is no more delete requests !',
     'broadcast': 'Please sent the message you want to broadcast.',
     'voice_info': 'Voice Name : {0}\n\nYou can use it by typing\n\n '
@@ -44,7 +46,16 @@ admin_messages = {
     'ban_voted': 'Voice has been deleted and user got banned !',
     'processed_before': 'Voice has been processed before !',
     'admin_voice_denied': 'Voice has been denied !',
-    'admin_voice_accepted': 'Voice has been accepted !'
+    'admin_voice_accepted': 'Voice has been accepted !',
+    'send_voice_id': 'Please send a voice ID to receive the voice file.',
+    'requested_voice': 'Your requested voice 👆',
+    'vote_before': 'You have voted this voice before !\nVotes will get updated every 5 minutes 🔄',
+    'voted': 'Your vote has been submitted ✔️',
+    'not_voted': 'You haven\'t voted yet !',
+    'voice_voted': 'You have voted this voice 👍',
+    'voted_before': 'You have voted this voice before !',
+    'took_vote_back': 'You have taken your vote back  👎',
+    'voice_tags': 'Please send voice tags(one tag per line).'
 }
 user_messages = {
     'back': 'شما به منوی اصلی بازگشتید 🔙',
@@ -134,5 +145,10 @@ user_messages = {
     'deleted_by_admins': 'ویس {0} توسط ادمین های ربات پاک شد 🚮',
     'voice_accepted': 'ویس ارسالی شما توسط کاربران ربات تایید شد ✅',
     'voice_denied': 'ویس ارسالی شما توسط کاربران ربات رد شد ❌',
-    'user_panel': 'پنل کاربری فعال شد 🔛'
+    'user_panel': 'پنل کاربری فعال شد 🔛',
+    'voice_tags': 'لطفا عبارت (تگ) های مربوط به ویس مورد را ارسال کنید.'
+                  ' تگ ها به کاربران کمک می کنند تا ویس شما را راحت تر جستجو و پیدا کنند ✅\n\n'
+                  '🔴 هر تگ باید در یک خط قرار بگیرد برای مثال اگر عبارات مربوط به ویس شما, سه عبارت'
+                  ' (صدای بلند, فریاد, داد زدن) باشد, متن ارسال شما باید به شکل زیر نوشته شود 👇\n\n'
+                  'صدای بلند\nفریاد\nداد زدن'
 }

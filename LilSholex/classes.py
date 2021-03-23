@@ -8,7 +8,7 @@ from asgiref.sync import sync_to_async
 
 
 class Base(ABC):
-    database: PersianMemeUser
+    database: Union[PersianMemeUser]
     _BASE_URL: str
 
     def __init__(
@@ -90,4 +90,8 @@ class Base(ABC):
 
     @abstractmethod
     async def go_back(self):
+        pass
+
+    @abstractmethod
+    def translate(self, key: str, *formatting_args):
         pass

@@ -11,6 +11,14 @@ from uuid import uuid4
 from . import translations
 
 
+class VoiceTag(models.Model):
+    tag = models.CharField(max_length=32, verbose_name='Tag Content', primary_key=True)
+
+    class Meta:
+        ordering = ['tag']
+        db_table = 'persianmeme_voice_tags'
+
+
 class User(models.Model):
     class Status(models.TextChoices):
         ACTIVE = 'a', 'Active'
@@ -33,33 +41,70 @@ class User(models.Model):
         ADMIN = 'a', 'Admin'
         USER = 'u', 'User'
 
+    class Menu(models.IntegerChoices):
+        ADMIN_MAIN = 1, 'Admin Main Menu'
+        ADMIN_VOICE_NAME = 2, 'Admin Voice Name',
+        ADMIN_NEW_VOICE = 3, 'Admin New Voice'
+        ADMIN_DELETE_VOICE = 4, 'Admin Delete Voice'
+        ADMIN_BAN_USER = 5, 'Admin Ban User'
+        ADMIN_UNBAN_USER = 6, 'Admin Unban User'
+        ADMIN_FULL_BAN_USER = 7, 'Admin Full Ban User'
+        ADMIN_MESSAGE_USER_ID = 8, 'Admin Message User ID'
+        ADMIN_MESSAGE_USER = 9, 'Admin Message User'
+        ADMIN_ADD_AD = 10, 'Admin Add Ad'
+        ADMIN_DELETE_AD = 11, 'Admin Delete Ad'
+        ADMIN_GET_USER = 12, 'Admin Get User'
+        ADMIN_BROADCAST = 13, 'Admin Broadcast'
+        ADMIN_EDIT_AD_ID = 14, 'Admin Edit Ad ID'
+        ADMIN_EDIT_AD = 15, 'Admin Edit Ad'
+        ADMIN_BAN_VOTE = 16, 'Admin Ban Vote'
+        ADMIN_DENY_VOICE = 17, 'Admin Deny Voice'
+        ADMIN_ACCEPT_VOICE = 18, 'Admin Accept Voice'
+        ADMIN_GET_VOICE = 40, 'Admin Get Voice'
+        ADMIN_VOICE_TAGS = 42, 'Admin Voice Tags'
+        USER_MAIN = 19, 'User Main'
+        USER_CONTACT_ADMIN = 20, 'User Contact Admin'
+        USER_SUGGEST_VOICE_NAME = 21, 'User Suggest Voice Name'
+        USER_SUGGEST_VOICE = 22, 'User Suggest Voice'
+        USER_DELETE_SUGGESTION = 23, 'User Delete Suggestion'
+        USER_RANKING = 24, 'User Ranking'
+        USER_SORTING = 25, 'User Sorting'
+        USER_DELETE_REQUEST = 26, 'User Delete Request'
+        USER_PRIVATE_VOICES = 27, 'User Private Voices'
+        USER_PRIVATE_VOICE_NAME = 28, 'User Private Voice Name'
+        USER_DELETE_PRIVATE_VOICE = 29, 'User Delete Private Voice'
+        USER_PRIVATE_VOICE = 30, 'User Private Voice'
+        USER_FAVORITE_VOICES = 31, 'User Favorite Voices'
+        USER_FAVORITE_VOICE = 32, 'User Favorite Voice'
+        USER_DELETE_FAVORITE_VOICE = 33, 'User Delete Favorite Voice'
+        USER_CANCEL_VOTING = 34, 'User Cancel Voting'
+        USER_PLAYLISTS = 35, 'User Playlists'
+        USER_CREATE_PLAYLIST = 36, 'User Create Playlist'
+        USER_MANAGE_PLAYLIST = 37, 'User Manage Playlist'
+        USER_ADD_VOICE_PLAYLIST = 38, 'User Add Voice To Playlist'
+        USER_MANAGE_PLAYLIST_VOICE = 39, 'User Manager Playlist Voice'
+        USER_SUGGEST_VOICE_TAGS = 41, 'User Suggest Voice Tags'
+
     user_id = models.AutoField(verbose_name='User ID', primary_key=True, unique=True)
-    chat_id = models.BigIntegerField(verbose_name='User Chat ID', unique=True)
-    menu = models.IntegerField(verbose_name='Current Menu', default=1)
-    status = models.CharField(
-        max_length=1,
-        choices=Status.choices,
-        default=Status.ACTIVE,
-        verbose_name='Current Status'
-    )
-    rank = models.CharField(max_length=1, choices=Rank.choices, default=Rank.USER, verbose_name='User Rank')
-    sent_message = models.BooleanField(verbose_name='Sent Message', default=False)
-    username = models.CharField(max_length=35, verbose_name='Username', null=True, blank=True)
+    chat_id = models.BigIntegerField(verbose_name='Chat ID', unique=True)
+    menu = models.PositiveSmallIntegerField(verbose_name='Current Menu', choices=Menu.choices, default=Menu.USER_MAIN)
+    status = models.CharField(max_length=1, choices=Status.choices, default=Status.ACTIVE)
+    rank = models.CharField(max_length=1, choices=Rank.choices, default=Rank.USER)
+    username = models.CharField(max_length=35, null=True, blank=True)
     temp_voice_name = models.CharField(max_length=50, null=True)
     temp_user_id = models.BigIntegerField(null=True)
-    last_usage_date = models.DateTimeField(auto_now=True, verbose_name='Last Usage Date')
+    temp_voice_tags = models.ManyToManyField(VoiceTag, 'user_voice_tags', blank=True)
+    last_usage_date = models.DateTimeField(auto_now=True)
     vote = models.BooleanField(verbose_name='Vote System', default=False)
     date = models.DateTimeField(verbose_name='Register Date', auto_now_add=True)
     voice_order = models.CharField(max_length=9, choices=VoiceOrder.choices, default=VoiceOrder.new_voice_id)
-    private_voices = models.ManyToManyField('Voice', 'private_voices', verbose_name='Private Voices', blank=True)
-    favorite_voices = models.ManyToManyField('Voice', 'favorite_voices', verbose_name='Favorite Voices', blank=True)
+    private_voices = models.ManyToManyField('Voice', 'private_voices', blank=True)
+    favorite_voices = models.ManyToManyField('Voice', 'favorite_voices', blank=True)
     back_menu = models.CharField(max_length=50, null=True, blank=True)
     started = models.BooleanField('Started', default=False)
-    last_start = models.DateTimeField(null=True, blank=True, verbose_name='Last Start')
-    last_broadcast = models.ForeignKey(
-        'Broadcast', models.SET_NULL, 'user_broadcast', null=True, blank=True, verbose_name='Last Broadcast'
-    )
-    playlists = models.ManyToManyField('Playlist', 'user_playlist', verbose_name='Playlists', blank=True)
+    last_start = models.DateTimeField(null=True, blank=True)
+    last_broadcast = models.ForeignKey('Broadcast', models.SET_NULL, 'user_broadcast', null=True, blank=True)
+    playlists = models.ManyToManyField('Playlist', 'user_playlist', blank=True)
     current_playlist = models.ForeignKey(
         'Playlist',
         models.SET_NULL,
@@ -68,16 +113,8 @@ class User(models.Model):
         verbose_name='Current Playlist',
         default=None
     )
-    current_voice = models.ForeignKey(
-        'Voice',
-        models.SET_NULL,
-        'user_voice',
-        blank=True,
-        null=True,
-        verbose_name='Current Voice',
-        default=None
-    )
-    current_ad = models.ForeignKey('Ad', models.SET_NULL, 'user_ad', null=True, blank=True, verbose_name='Current Ad')
+    current_voice = models.ForeignKey('Voice', models.SET_NULL, 'user_voice', blank=True, null=True, default=None)
+    current_ad = models.ForeignKey('Ad', models.SET_NULL, 'user_ad', null=True, blank=True)
     menu_mode = models.CharField(
         max_length=1, verbose_name='Menu Mode', choices=MenuMode.choices, default=MenuMode.USER
     )
@@ -126,16 +163,17 @@ class Voice(models.Model):
     message_id = models.BigIntegerField(verbose_name='Message ID', null=True, blank=True)
     file_id = models.CharField(max_length=200, verbose_name='Voice File ID')
     file_unique_id = models.CharField(max_length=100, verbose_name='Voice Unique ID')
-    name = models.CharField(max_length=200, verbose_name='Voice Name')
-    sender = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name='Voice Sender', related_name='senders')
-    voters = models.ManyToManyField(User, verbose_name='Voters', related_name='voters', blank=True)
+    name = models.CharField(max_length=200)
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='senders')
+    voters = models.ManyToManyField(User, related_name='voters', blank=True)
     votes = models.IntegerField(default=0, verbose_name='Up Votes')
-    status = models.CharField(max_length=1, choices=Status.choices, verbose_name='Voice Status')
+    status = models.CharField(max_length=1, choices=Status.choices)
     date = models.DateTimeField(auto_now_add=True, verbose_name='Register Date')
-    last_check = models.DateTimeField(auto_now=True, verbose_name='Last Check')
-    voice_type = models.CharField(max_length=1, choices=Type.choices, default=Type.NORMAL, verbose_name='Voice Type')
+    last_check = models.DateTimeField(auto_now=True)
+    voice_type = models.CharField(max_length=1, choices=Type.choices, default=Type.NORMAL)
     accept_vote = models.ManyToManyField(User, 'accept_vote_users', blank=True, verbose_name='Accept Votes')
     deny_vote = models.ManyToManyField(User, 'deny_vote_users', blank=True, verbose_name='Deny Votes')
+    tags = models.ManyToManyField(VoiceTag, 'voice_tags', blank=True)
 
     class Meta:
         db_table = 'persianmeme_voices'
@@ -208,7 +246,7 @@ class Voice(models.Model):
 
 
 class Ad(models.Model):
-    ad_id = models.AutoField(primary_key=True, verbose_name='Mass ID')
+    ad_id = models.AutoField(primary_key=True, verbose_name='Ad ID')
     chat_id = models.BigIntegerField(verbose_name='Chat ID')
     message_id = models.IntegerField(verbose_name='Message ID')
     seen = models.ManyToManyField(User, 'mass_seens', verbose_name='Seen By', blank=True)
@@ -223,8 +261,8 @@ class Ad(models.Model):
 
 class Delete(models.Model):
     delete_id = models.AutoField(primary_key=True, verbose_name='Delete ID')
-    voice = models.ForeignKey(Voice, models.CASCADE, 'deletes_voice', verbose_name='Voice')
-    user = models.ForeignKey(User, models.CASCADE, 'deletes_user', verbose_name='User')
+    voice = models.ForeignKey(Voice, models.CASCADE, 'deletes_voice')
+    user = models.ForeignKey(User, models.CASCADE, 'deletes_user')
 
     class Meta:
         db_table = 'persianmeme_deletes'
@@ -245,7 +283,7 @@ class Delete(models.Model):
 class Broadcast(models.Model):
     message_id = models.IntegerField('Message ID')
     sender = models.ForeignKey(User, models.CASCADE, 'broadcast_user', verbose_name='Sender Admin')
-    sent = models.BooleanField('Sent', default=False)
+    sent = models.BooleanField('Is Sent', default=False)
 
     @property
     @sync_to_async
@@ -262,9 +300,9 @@ class Broadcast(models.Model):
 
 class Playlist(models.Model):
     invite_link = models.UUIDField('Invite ID', default=uuid4)
-    name = models.CharField(max_length=60, verbose_name='Name')
-    voices = models.ManyToManyField(Voice, 'playlist_voice', verbose_name='Voices')
-    creator = models.ForeignKey(User, models.CASCADE, verbose_name='Creator')
+    name = models.CharField(max_length=60)
+    voices = models.ManyToManyField(Voice, 'playlist_voice')
+    creator = models.ForeignKey(User, models.CASCADE)
     date = models.DateTimeField('Creation Date', auto_now_add=True)
 
     def get_link(self):
@@ -276,6 +314,22 @@ class Playlist(models.Model):
 
     def __str__(self):
         return f'{self.name}:{self.creator.chat_id}'
+
+
+class Message(models.Model):
+    class Status(models.IntegerChoices):
+        PENDING = 1, 'Pending'
+        READ = 2, 'Read'
+
+    sender = models.ForeignKey(User, models.CASCADE, 'message_user')
+    message_id = models.PositiveBigIntegerField('Message ID')
+    status = models.PositiveSmallIntegerField(choices=Status.choices, default=Status.PENDING)
+
+    class Meta:
+        db_table = 'persianmeme_messages'
+
+    def __str__(self):
+        return f'{self.id} : {self.sender.chat_id}'
 
 
 PUBLIC_STATUS = (Voice.Status.ACTIVE, Voice.Status.SEMI_ACTIVE)

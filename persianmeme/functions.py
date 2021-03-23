@@ -1,4 +1,3 @@
-from urllib.parse import urlencode
 from django.conf import settings
 from LilSholex import decorators
 from LilSholex.functions import answer_callback_query as answer_callback_query_closure
@@ -40,13 +39,21 @@ def get_voice(file_unique_id, voice_type=models.Voice.Type.NORMAL):
 
 
 @sync_to_async
+def get_admin_voice(voice_id: int):
+    try:
+        return models.Voice.objects.get(voice_id=voice_id)
+    except (models.Voice.DoesNotExist, ValueError):
+        return None
+
+
+@sync_to_async
 def get_owner():
     return models.User.objects.get(rank='o')
 
 
 @sync_to_async
 def add_voice(file_id, file_unique_id, name, sender, status):
-    if not models.Voice.objects.filter(file_unique_id=file_unique_id, voice_type='n').exists():
+    if not models.Voice.objects.filter(file_unique_id=file_unique_id, voice_type=models.Voice.Type.NORMAL).exists():
         return models.Voice.objects.create(
             file_id=file_id, file_unique_id=file_unique_id, name=name, sender=sender, status=status
         )
@@ -65,7 +72,12 @@ def change_user_status(chat_id, status):
 
 @decorators.async_fix
 async def answer_inline_query(
-        inline_query_id: str, results: str, next_offset: str, cache_time: float, session: ClientSession
+        inline_query_id: str,
+        results: str,
+        next_offset: str,
+        cache_time: float,
+        is_personal: bool,
+        session: ClientSession
 ):
     async with session.get(
         f'https://api.telegram.org/bot{settings.MEME}/answerInlineQuery',
@@ -73,7 +85,7 @@ async def answer_inline_query(
             'results': results,
             'next_offset': next_offset,
             'cache_time': cache_time,
-            'is_personal': str(True),
+            'is_personal': str(is_personal),
             'inline_query_id': inline_query_id
         }
     ) as _:
@@ -240,3 +252,21 @@ def paginate(objs, page: int):
         page.previous_page_number() if page.has_previous() else None,
         page.next_page_number() if page.has_next() else None
     )
+
+
+@sync_to_async
+def get_contact_admin_messages():
+    return tuple(models.Message.objects.select_related('sender').filter(status=models.Message.Status.PENDING))
+
+
+@sync_to_async
+def get_message(message_id: int):
+    try:
+        target_message = models.Message.objects.select_related('sender').get(
+            id=message_id, status=models.Message.Status.PENDING
+        )
+    except models.Message.DoesNotExist:
+        return False
+    target_message.status = models.Message.Status.READ
+    target_message.save()
+    return target_message
