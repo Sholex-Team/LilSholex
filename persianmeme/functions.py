@@ -15,6 +15,7 @@ import asyncio
 from django import db
 from .keyboards import numbers
 from .types import ObjectType
+from string import punctuation
 
 
 @sync_to_async
@@ -49,14 +50,6 @@ def get_admin_voice(voice_id: int):
 @sync_to_async
 def get_owner():
     return models.User.objects.get(rank='o')
-
-
-@sync_to_async
-def add_voice(file_id, file_unique_id, name, sender, status):
-    if not models.Voice.objects.filter(file_unique_id=file_unique_id, voice_type=models.Voice.Type.NORMAL).exists():
-        return models.Voice.objects.create(
-            file_id=file_id, file_unique_id=file_unique_id, name=name, sender=sender, status=status
-        )
 
 
 @sync_to_async
@@ -205,13 +198,13 @@ async def perform_broadcast(broadcast: Broadcast):
                             break
                 except ClientError:
                     pass
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.6)
         while result := await get_page(broadcast):
             first_index = 0
             for last_index in range(settings.BROADCAST_LIMIT, settings.PAGINATION_LIMIT + 1, settings.BROADCAST_LIMIT):
                 await asyncio.gather(*[forwarder(user.chat_id) for user in result[first_index:last_index]])
                 first_index = last_index
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.7)
 
 
 def make_like_result(voices, offset: int, limit: int):

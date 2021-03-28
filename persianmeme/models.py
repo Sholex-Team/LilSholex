@@ -61,7 +61,11 @@ class User(models.Model):
         ADMIN_DENY_VOICE = 17, 'Admin Deny Voice'
         ADMIN_ACCEPT_VOICE = 18, 'Admin Accept Voice'
         ADMIN_GET_VOICE = 40, 'Admin Get Voice'
-        ADMIN_VOICE_TAGS = 42, 'Admin Voice Tags'
+        ADMIN_VOICE_TAGS = 42, 'Admin Voice Tags',
+        ADMIN_SEND_EDIT_VOICE = 44, 'Admin Send Edit Voice',
+        ADMIN_EDIT_VOICE = 45, 'Admin Edit Voice',
+        ADMIN_EDIT_VOICE_NAME = 46, 'Admin Edit Voice Name',
+        ADMIN_EDIT_VOICE_TAGS = 47, 'Admin Edit Voice Tags',
         USER_MAIN = 19, 'User Main'
         USER_CONTACT_ADMIN = 20, 'User Contact Admin'
         USER_SUGGEST_VOICE_NAME = 21, 'User Suggest Voice Name'
@@ -84,6 +88,7 @@ class User(models.Model):
         USER_ADD_VOICE_PLAYLIST = 38, 'User Add Voice To Playlist'
         USER_MANAGE_PLAYLIST_VOICE = 39, 'User Manager Playlist Voice'
         USER_SUGGEST_VOICE_TAGS = 41, 'User Suggest Voice Tags'
+        USER_PRIVATE_VOICE_TAGS = 43, 'User Private Voice Tags'
 
     user_id = models.AutoField(verbose_name='User ID', primary_key=True, unique=True)
     chat_id = models.BigIntegerField(verbose_name='Chat ID', unique=True)
@@ -204,7 +209,7 @@ class Voice(models.Model):
         self.deny_vote.clear()
         send_message(self.sender.chat_id, translations.user_messages['voice_accepted'])
         for admin in User.objects.filter(rank=User.Rank.ADMIN):
-            send_message(admin.chat_id, translations.admin_messages['voice_accepted'])
+            send_message(admin.chat_id, translations.admin_messages['new_voice_accepted'])
 
     def deny(self):
         from .functions import send_message
@@ -214,6 +219,11 @@ class Voice(models.Model):
     @sync_to_async
     def get_voters(self):
         return tuple(self.voters.all())
+    
+    @property
+    @sync_to_async
+    def get_tags(self):
+        return tuple(self.tags.all())
 
     def edit_vote_count(self):
         while True:
@@ -230,8 +240,11 @@ class Voice(models.Model):
 
     @async_fix
     async def send_voice(self, session: ClientSession) -> int:
+        tags_string = str()
+        for tag in await self.get_tags:
+            tags_string += f'\n<code>{tag.tag}</code>'
         encoded = urlencode({
-            'caption': f'<b>Voice Name</b>: {self.name}',
+            'caption': f'<b>Voice Name</b>: {self.name}\n\n<b>Voice Tags 👇</b>{tags_string}',
             'parse_mode': 'Html',
             'reply_markup': json.dumps(voice_keyboard())
         })

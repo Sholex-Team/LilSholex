@@ -9,7 +9,8 @@ admin_steps = {
     'voice_tags': {
         'menu': User.Menu.ADMIN_VOICE_TAGS,
         'message': translations.admin_messages['voice_tags'],
-        'before': 'voice_name'
+        'before': 'voice_name',
+        'callback': 'clear_temp_voice_tags'
     },
     'chat_id': {
         'menu': User.Menu.ADMIN_MESSAGE_USER_ID, 'message': translations.admin_messages['chat_id'], 'before': 'main'
@@ -18,7 +19,22 @@ admin_steps = {
         'menu': User.Menu.ADMIN_EDIT_AD_ID,
         'message': translations.admin_messages['edit_ad'],
         'keyboard': keyboards.en_back,
-        'before': 'main'
+        'before': 'main',
+        'callback': 'clear_current_ad'
+    },
+    'send_edit_voice': {
+        'menu': User.Menu.ADMIN_SEND_EDIT_VOICE,
+        'message': translations.admin_messages['send_edit_voice'],
+        'keyboard': keyboards.en_back,
+        'before': 'main',
+        'callback': 'clear_current_voice'
+    },
+    'edit_voice': {
+        'menu': User.Menu.ADMIN_EDIT_VOICE,
+        'message': translations.admin_messages['edit_voice'],
+        'keyboard': keyboards.edit_voice,
+        'before': 'send_edit_voice',
+        'callback': 'clear_temp_voice_tags'
     }
 }
 user_steps = {
@@ -43,23 +59,32 @@ user_steps = {
     'suggest_tags': {
         'menu': User.Menu.USER_SUGGEST_VOICE_TAGS,
         'message': translations.user_messages['voice_tags'],
-        'before': 'suggest_name'
+        'before': 'suggest_name',
+        'callback': 'clear_temp_voice_tags'
     },
     'private_name': {
         'menu': User.Menu.USER_PRIVATE_VOICE_NAME,
         'message': translations.user_messages['voice_name'],
         'before': 'main'
     },
+    'private_voice_tags': {
+        'menu': User.Menu.USER_PRIVATE_VOICE_TAGS,
+        'message': translations.user_messages['voice_tags'],
+        'before': 'private_name',
+        'callback': 'clear_temp_voice_tags'
+    },
     'manage_playlists': {
         'menu': User.Menu.USER_PLAYLISTS,
         'message': translations.user_messages['manage_playlists'],
         'keyboard': keyboards.manage_playlists,
-        'before': 'main'
+        'before': 'main',
+        'callback': 'clear_current_playlist'
     },
     'manage_playlist': {
         'menu': User.Menu.USER_MANAGE_PLAYLIST,
         'message': translations.user_messages['manage_playlist'],
         'keyboard': keyboards.manage_playlist,
-        'before': 'manage_playlists'
+        'before': 'manage_playlists',
+        'callback': 'clear_current_voice'
     }
 }

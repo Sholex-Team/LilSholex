@@ -260,5 +260,5 @@ class Message(admin.ModelAdmin):
 class VoiceTag(admin.ModelAdmin):
     list_display = ('tag',)
     search_fields = ('tag',)
-    list_per_page = 15
+    list_per_page = 30
     fieldsets = (('Information', {'fields': ('tag',)}),)

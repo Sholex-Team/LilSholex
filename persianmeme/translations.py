@@ -24,8 +24,7 @@ admin_messages = {
     'voice_info': 'Voice Name : {0}\n\nYou can use it by typing\n\n '
                   '@Persian_Meme_Bot {0}\n\nin a chat 😁',
     'voice_not_found': 'I could not find this voice ☹',
-    'unknown': 'Unknown Command ⚠',
-    'name_limit': 'Voice name is longer than limit !',
+    'unknown_command': 'Unknown Command ⚠',
     'voice_added': 'Voice has been added to database ✅',
     'voice_is_added': 'Voice is already in the database ❌',
     'invalid_user_id': 'User ID is not valid ⚠',
@@ -41,7 +40,7 @@ admin_messages = {
     'ad_edited': 'Ad has been edited ✔️',
     'send_a_voice': 'Please send a voice ⚠️',
     'deleted_by_admins': 'Voice has been deleted{0} !\nName : {1}\nFile ID : {2}',
-    'voice_accepted': 'A new voice accepted ⚠️',
+    'new_voice_accepted': 'A new voice accepted ⚠️',
     'admin_panel': 'Admin panel activated 🔛',
     'ban_voted': 'Voice has been deleted and user got banned !',
     'processed_before': 'Voice has been processed before !',
@@ -55,7 +54,22 @@ admin_messages = {
     'voice_voted': 'You have voted this voice 👍',
     'voted_before': 'You have voted this voice before !',
     'took_vote_back': 'You have taken your vote back  👎',
-    'voice_tags': 'Please send voice tags(one tag per line).'
+    'voice_tags': 'Please send voice tags(one tag per line).',
+    'invalid_voice_tag': 'Voice Tags contain invalid characters !',
+    'long_voice_tag': 'Voice Tags are too long !',
+    'too_many_voice_tags': 'You can not add more than 6 tags !',
+    'down_for_maintenance': 'This section of the bot is unaccessible due to maintenance.',
+    'you_are_banned': 'You have got banned from using the bot 🚫',
+    'read': 'Read ✅',
+    'voice_denied': 'Your voice has been denied ❌',
+    'voice_accepted': 'Your voice has been accepted ✅',
+    'send_edit_voice': 'Send the voice which you want to edit.',
+    'edit_voice': 'Use one of these options to edit the voice 👇',
+    'edit_voice_name': 'Send the new name of your voice.',
+    'edit_voice_tags': 'Send new voice tags.',
+    'voice_name_edited': 'Voice name has been edited ✔️',
+    'voice_tags_edited': 'Voice tags have been edited ✔️',
+    'invalid_voice_name': 'Voice name is invalid ⚠️'
 }
 user_messages = {
     'back': 'شما به منوی اصلی بازگشتید 🔙',
@@ -124,6 +138,7 @@ user_messages = {
     'request_created': 'درخواست شما با موفقیت ثبت شد ✅',
     'voice_limit': 'شما حداکثر تعداد ویس ها را اضافه کرده اید ⚠️',
     'added_to_favorite': 'ویس مورد نظر به لیست علاقه مندی های شما اضافه شد ✔️',
+    'private_voice_added': 'این ویس به لیست ویس های شما اضافه شد ✅',
     'voice_exists_in_list': 'ویس در لیست موجود است ❌',
     'deleted_from_list': 'ویس از لیست حذف شد !',
     'voting_canceled': 'رای گیری ویس شما لغو شد ✔️',
@@ -149,6 +164,10 @@ user_messages = {
     'voice_tags': 'لطفا عبارت (تگ) های مربوط به ویس مورد را ارسال کنید.'
                   ' تگ ها به کاربران کمک می کنند تا ویس شما را راحت تر جستجو و پیدا کنند ✅\n\n'
                   '🔴 هر تگ باید در یک خط قرار بگیرد برای مثال اگر عبارات مربوط به ویس شما, سه عبارت'
-                  ' (صدای بلند, فریاد, داد زدن) باشد, متن ارسال شما باید به شکل زیر نوشته شود 👇\n\n'
-                  'صدای بلند\nفریاد\nداد زدن'
+                  ' (صدای بلند, فریاد, داد زدن) باشد, متن ارسالی شما باید به شکل زیر نوشته شود 👇\n\n'
+                  'صدای بلند\nفریاد\nداد زدن',
+    'invalid_voice_tag': 'تگ های وارد شده دارای کارکتر های غیر مجاز می باشند !',
+    'long_voice_tag': 'طول یک یا چند تگ وارد شده بیش از 32 کارکتر است ❌',
+    'too_many_voice_tags': 'شما نمی توانید برای هر ویس بیش از 6 تگ تعریف کنید ⚠️',
+    'down_for_maintenance': 'این بخش از ربات به علت به روزرسانی در دسترس نیست !'
 }

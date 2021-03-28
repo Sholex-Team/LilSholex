@@ -7,12 +7,23 @@ from aiohttp import ClientSession
 from datetime import datetime, timedelta
 from LilSholex.functions import filter_object
 from persianmeme.functions import (
-    make_like_result, make_result, paginate, get_vote, delete_vote_async, get_contact_admin_messages
+    make_like_result,
+    make_result,
+    paginate,
+    get_vote,
+    delete_vote_async,
+    get_contact_admin_messages,
+    get_voice
 )
 from enum import Enum
 from . import translations, models, steps
 from typing import Union
 from .keyboards import message as message_keyboard, manage_message
+from .types import InvalidVoiceTag, LongVoiceTag, TooManyVoiceTags
+from string import punctuation
+from itertools import combinations
+from django.db.models import Q, Case, When, BooleanField
+from asyncio import iscoroutinefunction
 
 
 class User(Base):
@@ -155,25 +166,44 @@ class User(Base):
             await self.__save_ad(ad)
 
     @sync_to_async
-    def get_voices(self, query, offset: str):
+    def get_voices(self, query: str, offset: str):
         if len(splinted_offset := offset.split(':')) != 4:
             splinted_offset = [0] * 4
+        if query.startswith('names:'):
+            query = query[6:].strip()
+            queries = Q(name__icontains=query[6:].strip())
+        else:
+            if is_tags := query.startswith('tags:'):
+                query = query[5:].strip()
+            first_tags = query.split()
+            second_tags = [
+                ' '.join(first_tags[start:end + 1]) for start, end in combinations(range(len(first_tags)), 2)
+                ]
+            queries = (Q(tags__tag__iexact=first_tags.pop(0)) if first_tags else Q()) if is_tags else \
+                Q(name__icontains=query)
+            for tag in first_tags:
+                queries |= Q(tags__tag__iexact=tag)
+            for tag in second_tags:
+                queries |= Q(tags__tag__iexact=tag)
+        is_name = Case(When(name__icontains=query, then=True), default=False, output_field=BooleanField())
         result_sets = (
             lambda: [
                 voice for playlist in self.database.playlists.prefetch_related('voices')
-                for voice in playlist.voices.filter(name__icontains=query).order_by(self.database.voice_order)
+                for voice in playlist.voices.filter(
+                    queries
+                ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct()
             ],
-            lambda: self.database.private_voices.all().filter(name__icontains=query).order_by(
-                self.database.voice_order
-            ),
+            lambda: self.database.private_voices.all().filter(
+                queries
+            ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct(),
             lambda: self.database.favorite_voices.all().filter(
-                name__icontains=query, status__in=models.PUBLIC_STATUS
-            ).order_by(self.database.voice_order),
+                queries & Q(status__in=models.PUBLIC_STATUS)
+            ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct(),
             lambda: models.Voice.objects.filter(
-                name__icontains=query,
-                status__in=models.PUBLIC_STATUS,
-                voice_type=models.Voice.Type.NORMAL
-            ).order_by(self.database.voice_order)
+                queries &
+                Q(status__in=models.PUBLIC_STATUS) &
+                Q(voice_type=models.Voice.Type.NORMAL)
+            ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct()
         )
         results = []
         remaining = 50
@@ -249,14 +279,16 @@ class User(Base):
 
     @sync_to_async
     def create_private_voice(self, message: dict):
-        self.database.private_voices.create(
+        new_voice = self.database.private_voices.create(
             file_id=message['voice']['file_id'],
             file_unique_id=message['voice']['file_unique_id'],
             status=models.Voice.Status.ACTIVE,
             voice_type=models.Voice.Type.PRIVATE,
             sender=self.database,
-            name=self.database.temp_voice_name
+            name=self.database.temp_voice_name,
         )
+        new_voice.tags.set(self.database.temp_voice_tags.all())
+        self.database.temp_voice_tags.clear()
 
     @sync_to_async
     def add_favorite_voice(self, voice: models.Voice):
@@ -293,20 +325,31 @@ class User(Base):
         ) as _:
             return
 
-    async def go_back(self):
+    @property
+    def __back_menu(self):
         try:
             if self.database.menu_mode != self.database.MenuMode.USER:
-                step = steps.admin_steps[self.database.back_menu]
-            else:
-                step = steps.user_steps[self.database.back_menu]
+                return steps.admin_steps[self.database.back_menu]
+            return steps.user_steps[self.database.back_menu]
         except KeyError:
             if self.database.menu_mode != self.database.MenuMode.USER:
-                step = steps.admin_steps['main']
+                return steps.admin_steps['main']
+            return steps.user_steps['main']
+    
+    async def __perform_back_callback(self, callback: str):
+        if callback:
+            target_method = getattr(self, callback)
+            if iscoroutinefunction(target_method):
+                await target_method()
             else:
-                step = steps.user_steps['main']
+                target_method()
+
+    async def go_back(self):
+        step = self.__back_menu
         self.database.menu = step['menu']
         self.database.back_menu = step.get('before')
         await self.send_message(step['message'], step.get('keyboard', ''))
+        await self.__perform_back_callback(step.get('callback'))
         await self.save()
 
     @async_fix
@@ -467,3 +510,87 @@ class User(Base):
             (self.__enforced_rank == self.database.Rank.USER) or
             (self.__enforced_rank not in models.BOT_ADMINS and self.database.menu_mode == self.database.MenuMode.USER)
         ) else translations.admin_messages[key]).format(*formatting_args)
+
+    @sync_to_async
+    def __check_voice_tags(self, tags: str):
+        if 'tags:' in tags:
+            raise InvalidVoiceTag()
+        if len(tags) >= len(punctuation):
+            if any(char in tags for char in punctuation):
+                raise InvalidVoiceTag()
+        else:
+            if any(char in punctuation for char in tags):
+                raise InvalidVoiceTag()
+        tags = tags.split('\n')
+        if len(tags) > 6:
+            raise TooManyVoiceTags()
+        if any(len(tag) > 32 for tag in tags):
+            raise LongVoiceTag()
+        for tag in tags:
+            self.database.temp_voice_tags.add(models.VoiceTag.objects.get_or_create(tag=tag)[0])
+    
+    async def process_voice_tags(self, tags: str):
+        if not tags:
+            await self.send_message(self.translate('voice_tags'))
+            return False
+        try:
+            await self.__check_voice_tags(tags)
+        except ValueError as e:
+            await self.send_message(self.translate(str(e)))
+            return False
+        return True
+    
+    @sync_to_async
+    def clear_temp_voice_tags(self):
+        self.database.temp_voice_tags.clear()
+
+    @sync_to_async
+    def add_voice(self, file_id, file_unique_id, status):
+        if not models.Voice.objects.filter(file_unique_id=file_unique_id, voice_type=models.Voice.Type.NORMAL).exists():
+            new_voice = models.Voice.objects.create(
+                file_id=file_id,
+                file_unique_id=file_unique_id,
+                name=self.database.temp_voice_name,
+                sender=self.database,
+                status=status
+            )
+            new_voice.tags.set(self.database.temp_voice_tags.all())
+            self.database.temp_voice_tags.clear()
+            return new_voice
+    
+    @sync_to_async
+    def edit_voice_name(self, new_name: str):
+        self.database.current_voice.name = new_name
+        self.database.current_voice.save()
+    
+    @sync_to_async
+    def edit_voice_tags(self):
+        self.database.current_voice.tags.set(self.database.temp_voice_tags.all())
+        self.database.temp_voice_tags.clear()
+    
+    async def validate_voice_name(self, message: dict):
+        if message.get('entities') or len(message['text']) > 50 or message['text'].startswith('tags:') or \
+                message['text'].startswith('names:'):
+            await self.send_message(
+                self.translate('invalid_voice_name'), reply_to_message_id=message['message_id']
+            )
+            return False
+        return True
+
+    async def get_public_voice(self, message: dict):
+        if target_voice := await get_voice(message['voice']['file_unique_id']):
+            return target_voice
+        await self.send_message(self.translate('voice_not_found'), reply_to_message_id=message['message_id'])
+        return None
+    
+    def clear_current_playlist(self):
+        self.database.current_playlist = None
+    
+    def clear_current_voice(self):
+        self.database.current_voice = None
+    
+    def clear_current_ad(self):
+        self.database.current_ad = None
+    
+    async def menu_cleanup(self):
+        await self.__perform_back_callback(self.__back_menu.get('callback'))

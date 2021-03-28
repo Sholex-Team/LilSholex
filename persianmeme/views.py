@@ -109,7 +109,7 @@ async def webhook(request):
             )
             await user.send_message(user.translate('checked_by_admin'))
             if callback_data[0] == message_options[0]:
-                await answer_query(query_id, 'Read ✅', False)
+                await answer_query(query_id, inliner.translate('read'), False)
             elif callback_data[0] == message_options[1]:
                 await user.send_message(user.translate('you_are_banned'))
                 user.database.status = user.database.Status.BANNED
@@ -132,7 +132,7 @@ async def webhook(request):
                 if await functions.accept_voice(message['voice']['file_unique_id']):
                     await answer_query(query_id, inliner.translate('accepted'), False)
                 else:
-                    await answer_query(query_id, 'Voice has been processed before ✖️', False)
+                    await answer_query(query_id, inliner.translate('processed_before'), False)
             await inliner.delete_message(message_id)
         elif callback_data[0] in ('delete', 'delete_deny'):
             target_delete = await functions.get_delete(callback_data[1])
@@ -205,12 +205,14 @@ async def webhook(request):
             return HttpResponse(status=200)
         if user.database.rank != user.database.Rank.USER:
             if text == '/admin':
+                await user.menu_cleanup()
                 user.database.menu_mode = user.database.MenuMode.ADMIN
                 user.database.menu = user.database.Menu.ADMIN_MAIN
                 await user.send_message(user.translate('admin_panel'), keyboards.owner, message_id)
                 await user.save()
                 return HttpResponse(status=200)
             elif text == '/user':
+                await user.menu_cleanup()
                 user.database.menu_mode = user.database.MenuMode.USER
                 user.database.menu = user.database.Menu.USER_MAIN
                 await user.send_message(user.translate('user_panel'), keyboards.user, message_id)
@@ -218,6 +220,7 @@ async def webhook(request):
                 return HttpResponse(status=200)
         if user.database.rank != user.database.Rank.USER and user.database.menu_mode == user.database.MenuMode.ADMIN:
             if text == '/start':
+                await user.menu_cleanup()
                 user.database.menu = user.database.Menu.ADMIN_MAIN
                 await user.send_message(user.translate('welcome'), keyboards.owner, message_id)
             elif user.database.menu == user.database.Menu.ADMIN_MAIN:
@@ -241,7 +244,8 @@ async def webhook(request):
                     'Ban Vote',
                     'Accept Voice',
                     'Deny Voice',
-                    'Get Voice'
+                    'Get Voice',
+                    'Edit Voice'
                 )):
                     if text == admin_options[0]:
                         user.database.menu = user.database.Menu.ADMIN_GET_USER
@@ -281,10 +285,15 @@ async def webhook(request):
                     elif text == admin_options[8]:
                         user.database.menu = user.database.Menu.ADMIN_DENY_VOICE
                         await user.send_message(user.translate('send_a_voice'), keyboards.en_back)
-                    else:
+                    elif text == admin_options[9]:
                         user.database.menu = user.database.Menu.ADMIN_GET_VOICE
                         await user.send_message(
                             user.translate('send_voice_id'), keyboards.en_back
+                        )
+                    else:
+                        user.database.menu = user.database.Menu.ADMIN_SEND_EDIT_VOICE
+                        await user.send_message(
+                            user.translate('send_edit_voice'), keyboards.en_back
                         )
                 # Owner Section
                 elif user.database.rank == user.database.Rank.OWNER and text in (owner_options := (
@@ -330,35 +339,33 @@ async def webhook(request):
                     else:
                         await user.send_messages()
                 elif 'voice' in message:
-                    search_result = await functions.get_voice(message['voice']['file_unique_id'])
-                    if search_result:
+                    if search_result := await user.get_public_voice(message):
                         target_voice_name = search_result.name
                         await user.send_message(
                             user.translate('voice_info', target_voice_name),
                             keyboards.use(target_voice_name)
                         )
-                    else:
-                        await user.send_message(user.translate('voice_not_found'))
                 else:
-                    await user.send_message(user.translate('unknown'))
+                    await user.send_message(user.translate('unknown_command'))
             elif user.database.menu == user.database.Menu.ADMIN_VOICE_NAME:
                 if text:
-                    if len(text) > 50:
-                        await user.send_message(user.translate('name_limit'))
-                    else:
-                        user.database.menu = user.database.Menu.ADMIN_NEW_VOICE
+                    if await user.validate_voice_name(message):
+                        user.database.menu = user.database.Menu.ADMIN_VOICE_TAGS
                         user.database.temp_voice_name = text
                         user.database.back_menu = 'voice_name'
-                        await user.send_message(user.translate('voice'))
+                        await user.send_message(user.translate('voice_tags'))
                 else:
                     await user.send_message(user.translate('voice_name'))
+            elif user.database.menu == user.database.Menu.ADMIN_VOICE_TAGS:
+                if await user.process_voice_tags(text):
+                    user.database.menu = user.database.Menu.ADMIN_NEW_VOICE
+                    user.database.back_menu = 'voice_tags'
+                    await user.send_message(user.translate('voice'))
             elif user.database.menu == user.database.Menu.ADMIN_NEW_VOICE:
                 if await user.voice_exists(message):
-                    if await functions.add_voice(
+                    if await user.add_voice(
                             message['voice']['file_id'],
                             message['voice']['file_unique_id'],
-                            user.database.temp_voice_name,
-                            user.database,
                             models.Voice.Status.ACTIVE
                     ):
                         user.database.menu = user.database.Menu.ADMIN_MAIN
@@ -496,6 +503,34 @@ async def webhook(request):
                     )
                 else:
                     await user.send_message(user.translate('voice_not_found'))
+            elif user.database.menu == user.database.Menu.ADMIN_SEND_EDIT_VOICE:
+                if await user.voice_exists(message):
+                    if target_voice := await user.get_public_voice(message):
+                        user.database.current_voice = target_voice
+                        user.database.back_menu = 'send_edit_voice'
+                        user.database.menu = user.database.Menu.ADMIN_EDIT_VOICE
+                        await user.send_message(user.translate('edit_voice'), keyboards.edit_voice)
+            elif user.database.menu == user.database.Menu.ADMIN_EDIT_VOICE:
+                if text in (edit_options := ('Edit Name', 'Edit Tags')):
+                    user.database.back_menu = 'edit_voice'
+                    if text == edit_options[0]:
+                        user.database.menu = user.database.Menu.ADMIN_EDIT_VOICE_NAME
+                        await user.send_message(user.translate('edit_voice_name'), keyboards.en_back)
+                    else:
+                        user.database.menu = user.database.Menu.ADMIN_EDIT_VOICE_TAGS
+                        await user.send_message(user.translate('edit_voice_tags'), keyboards.en_back)
+                else:
+                    await user.send_message(user.translate('unknown_command'), reply_to_message_id=message_id)
+            elif user.database.menu == user.database.Menu.ADMIN_EDIT_VOICE_NAME:
+                if await user.validate_voice_name(message):
+                    await user.edit_voice_name(text)
+                    await user.send_message(user.translate('voice_name_edited'), reply_to_message_id=message_id)
+                    await user.go_back()
+            elif user.database.menu == user.database.Menu.ADMIN_EDIT_VOICE_TAGS:
+                if await user.process_voice_tags(text):
+                    await user.edit_voice_tags()
+                    await user.send_message(user.translate('voice_tags_edited'), reply_to_message_id=message_id)
+                    await user.go_back()
         elif user.database.status == user.database.Status.ACTIVE and \
                 (user.database.rank == user.database.Rank.USER or
                  user.database.menu_mode == user.database.MenuMode.USER):
@@ -514,6 +549,7 @@ async def webhook(request):
                         await user.send_message(user.translate('invalid_playlist'), keyboards.user)
                 else:
                     await user.send_message(user.translate('welcome'), keyboards.user)
+                user.database.menu_mode = user.database.MenuMode.USER
                 user.database.menu = user.database.Menu.USER_MAIN
             elif user.database.menu == user.database.Menu.USER_MAIN:
                 user.database.back_menu = 'main'
@@ -590,13 +626,11 @@ async def webhook(request):
                     user.database.menu = user.database.Menu.USER_PLAYLISTS
                     await user.send_message(user.translate('manage_playlists'), keyboards.manage_playlists)
                 elif 'voice' in message:
-                    if search_result := await functions.get_voice(message['voice']['file_unique_id']):
+                    if search_result := await user.get_public_voice(message):
                         await user.send_message(
                             user.translate('voice_info', search_result.name),
                             keyboards.use(search_result.name)
                         )
-                    else:
-                        await user.send_message(user.translate('voice_not_found'))
                 else:
                     await user.send_message(user.translate('unknown_command'))
             elif user.database.menu == user.database.Menu.USER_CONTACT_ADMIN:
@@ -605,25 +639,25 @@ async def webhook(request):
                 await user.send_message(user.translate('message_sent'), keyboards.user, message_id)
             elif user.database.menu == user.database.Menu.USER_SUGGEST_VOICE_NAME:
                 if text:
-                    if message.get('entities') or len(text) > 50:
-                        await user.send_message(user.translate('invalid_voice_name'))
-                    else:
-                        user.database.menu = user.database.Menu.USER_SUGGEST_VOICE
+                    if await user.validate_voice_name(message):
+                        user.database.menu = user.database.Menu.USER_SUGGEST_VOICE_TAGS
                         user.database.temp_voice_name = text
                         user.database.back_menu = 'suggest_name'
-                        await user.send_message(user.translate('send_voice'))
+                        await user.send_message(user.translate('voice_tags'))
                 else:
                     await user.send_message(user.translate('invalid_voice_name'))
+            elif user.database.menu == user.database.Menu.USER_SUGGEST_VOICE_TAGS:
+                if await user.process_voice_tags(text):
+                    user.database.menu = user.database.Menu.USER_SUGGEST_VOICE
+                    user.database.back_menu = 'suggest_tags'
+                    await user.send_message(user.translate('send_voice'))
             elif user.database.menu == user.database.Menu.USER_SUGGEST_VOICE:
                 if await user.voice_exists(message):
-                    target_voice = await functions.add_voice(
+                    if target_voice := await user.add_voice(
                         message['voice']['file_id'],
                         message['voice']['file_unique_id'],
-                        user.database.temp_voice_name,
-                        user.database,
-                        'p'
-                    )
-                    if target_voice:
+                        models.Voice.Status.PENDING
+                    ):
                         user.database.menu = user.database.Menu.USER_MAIN
                         target_voice.message_id = await target_voice.send_voice(request.http_session)
                         await create_task(tasks.check_voice, target_voice.voice_id)
@@ -676,10 +710,7 @@ async def webhook(request):
                     await user.send_message(user.translate('unknown_command'))
             elif user.database.menu == user.database.Menu.USER_DELETE_REQUEST:
                 if await user.voice_exists(message):
-                    target_voice = await functions.get_voice(
-                        message['voice']['file_unique_id']
-                    )
-                    if target_voice:
+                    if target_voice := await user.get_public_voice(message):
                         owner = await classes.User(
                             request.http_session, classes.User.Mode.NORMAL, instance=await functions.get_owner()
                         )
@@ -689,11 +720,9 @@ async def webhook(request):
                         )
                         await user.delete_request(target_voice)
                         await owner.send_message('New delete request 🗑')
-                    else:
-                        await user.send_message(user.translate('voice_not_found'))
             elif user.database.menu == user.database.Menu.USER_PRIVATE_VOICES:
                 if text == 'افزودن ⏬':
-                    if await user.private_user_count() <= 60:
+                    if await user.private_user_count() <= 120:
                         user.database.menu = user.database.Menu.USER_PRIVATE_VOICE_NAME
                         user.database.back_menu = 'private'
                         await user.send_message(user.translate('voice_name'), keyboards.per_back)
@@ -707,38 +736,36 @@ async def webhook(request):
                     await user.send_message(user.translate('unknown_command'))
             elif user.database.menu == user.database.Menu.USER_PRIVATE_VOICE_NAME:
                 if text:
-                    if len(text) > 50:
-                        await user.send_message(user.translate('invalid_voice_name'))
-                    else:
+                    if await user.validate_voice_name(message):
                         user.database.temp_voice_name = text
-                        user.database.menu = user.database.Menu.USER_PRIVATE_VOICE
+                        user.database.menu = user.database.Menu.USER_PRIVATE_VOICE_TAGS
                         user.database.back_menu = 'private_name'
-                        await user.send_message(user.translate('send_voice'))
+                        await user.send_message(user.translate('voice_tags'))
                 else:
                     await user.send_message(user.translate('invalid_voice_name'))
-            elif user.database.menu == user.database.Menu.USER_DELETE_PRIVATE_VOICE:
-                if await user.voice_exists(message):
-                    current_voice = await functions.get_voice(
-                        message['voice']['file_unique_id'], voice_type='p'
-                    )
-                    if current_voice:
-                        if await user.delete_private_voice(current_voice):
-                            user.database.menu = user.database.Menu.USER_PRIVATE_VOICES
-                            user.database.back_menu = 'main'
-                            await user.send_message(user.translate('voice_deleted'), keyboards.private)
-                        else:
-                            await user.send_message(user.translate('voice_is_not_yours'))
-                    else:
-                        await user.send_message(user.translate('voice_not_found'))
+            elif user.database.menu == user.database.Menu.USER_PRIVATE_VOICE_TAGS:
+                if await user.process_voice_tags(text):
+                    user.database.menu = user.database.Menu.USER_PRIVATE_VOICE
+                    user.database.back_menu = 'private_voice_tags'
+                    await user.send_message(user.translate('send_voice'))
             elif user.database.menu == user.database.Menu.USER_PRIVATE_VOICE:
                 if await user.voice_exists(message):
                     if not await functions.get_voice(message['voice']['file_unique_id']):
                         await user.create_private_voice(message)
                         user.database.menu = user.database.Menu.USER_PRIVATE_VOICES
                         user.database.back_menu = 'main'
-                        await user.send_message('این ویس به لیست ویس های شما اضافه شد ✅', keyboards.private)
+                        await user.send_message(user.translate('private_voice_added'), keyboards.private)
                     else:
-                        await user.send_message('این ویس در ربات موجود است ❌')
+                        await user.send_message(user.translate('voice_exists'))
+            elif user.database.menu == user.database.Menu.USER_DELETE_PRIVATE_VOICE:
+                if await user.voice_exists(message):
+                    if current_voice := await user.get_public_voice(message):
+                        if await user.delete_private_voice(current_voice):
+                            user.database.menu = user.database.Menu.USER_PRIVATE_VOICES
+                            user.database.back_menu = 'main'
+                            await user.send_message(user.translate('voice_deleted'), keyboards.private)
+                        else:
+                            await user.send_message(user.translate('voice_is_not_yours'))
             elif user.database.menu == user.database.Menu.USER_FAVORITE_VOICES:
                 if text == 'افزودن ⏬':
                     if await user.count_favorite_voices() <= 30:
@@ -755,8 +782,7 @@ async def webhook(request):
                     await user.send_message(user.translate('unknown_command'))
             elif user.database.menu == user.database.Menu.USER_FAVORITE_VOICE:
                 if await user.voice_exists(message):
-                    current_voice = await functions.get_voice(message['voice']['file_unique_id'])
-                    if current_voice:
+                    if current_voice := await user.get_public_voice(message):
                         if await user.add_favorite_voice(current_voice):
                             user.database.menu = user.database.Menu.USER_FAVORITE_VOICES
                             user.database.back_menu = 'main'
@@ -766,18 +792,13 @@ async def webhook(request):
                             )
                         else:
                             await user.send_message(user.translate('voice_exists_in_list'))
-                    else:
-                        await user.send_message(user.translate('voice_not_found'))
             elif user.database.menu == user.database.Menu.USER_DELETE_FAVORITE_VOICE:
                 if await user.voice_exists(message):
-                    current_voice = await functions.get_voice(message['voice']['file_unique_id'])
-                    if current_voice:
+                    if current_voice := await user.get_public_voice(message):
                         await user.delete_favorite_voice(current_voice)
                         user.database.menu = user.database.Menu.USER_FAVORITE_VOICES
                         user.database.back_menu = 'main'
                         await user.send_message(user.translate('deleted_from_list'), keyboards.private)
-                    else:
-                        await user.send_message(user.translate('voice_not_found'))
             elif user.database.menu == user.database.Menu.USER_CANCEL_VOTING:
                 if await user.voice_exists(message):
                     if await user.cancel_voting(message['voice']['file_unique_id']):
