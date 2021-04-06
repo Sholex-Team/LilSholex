@@ -39,6 +39,6 @@ six==1.15.0
 sqlparse==0.4.1
 toml==0.10.2
 typing-extensions==3.7.4.3
-urllib3==1.26.3
+urllib3==1.26.4
 yarl==1.6.3
 zope.interface==5.2.0
