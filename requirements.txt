@@ -13,7 +13,7 @@ cffi==1.14.5
 chardet==3.0.4
 cryptography==3.4.6
 daphne==3.0.1
-Django==3.1.7
+Django==3.1.8
 django-background-tasks==1.2.5
 django-compat==1.0.15
 gunicorn==20.0.4
