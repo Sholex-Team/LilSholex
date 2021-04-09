@@ -106,7 +106,7 @@ services:
     secrets:
       - db_password
       - persianmeme_channel
-      - persianmeme_anim
+      - persianmeme_help_messages
       - persianmeme_token
       - secret_key
       - persianmeme_logs
@@ -157,7 +157,7 @@ services:
     secrets:
       - db_password
       - persianmeme_channel
-      - persianmeme_anim
+      - persianmeme_help_messages
       - persianmeme_token
       - secret_key
       - persianmeme_logs
@@ -208,7 +208,7 @@ services:
       - secret_key
       - persianmeme_token
       - persianmeme_channel
-      - persianmeme_anim
+      - persianmeme_help_messages
       - persianmeme_logs
       - persianmeme_messages
     depends_on:
@@ -251,7 +251,7 @@ services:
       - secret_key
       - persianmeme_token
       - persianmeme_channel
-      - persianmeme_anim
+      - persianmeme_help_messages
       - persianmeme_logs
       - persianmeme_messages
     depends_on:
@@ -291,7 +291,7 @@ services:
       - secret_key
       - persianmeme_token
       - persianmeme_channel
-      - persianmeme_anim
+      - persianmeme_help_messages
       - persianmeme_logs
       - persianmeme_messages
     depends_on:
@@ -346,12 +346,12 @@ secrets:
     external: true
   persianmeme_token:
     external: true
-  persianmeme_anim:
-    external: true
   persianmeme_logs:
     external: true
   persianmeme_messages:
     external: true
+  persianmeme_help_messages:
+    file: secrets/help_messages.json
   secret_key:
     external: true
   ssl_certificate:
