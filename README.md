@@ -17,6 +17,7 @@ A Project Containing Telegram API bots and small web apps .
    - ssl_key : SSL private key
    - dhparam : SSL dhparam
    - domain : Your Domain
+   - persianmeme_help_messages : A JSON file containing help messages and animations
 4. Replace {persianmeme_token} & {domain} inside conf/nginx.conf with
    your domain and bot token
 5. `docker stack deploy -c docker-compose.yml {stack name}`
