@@ -17,7 +17,7 @@ owner = {'keyboard': [
     ['Get Voice', 'Get User'],
     ['Add Ad', 'Delete Ad', 'Edit Ad'],
     ['Accept Voice', 'Ban Vote', 'Deny Voice'],
-    ['Edit Voice'],
+    ['Edit Voice', 'File ID'],
     ['Messages', 'Accepted', 'Delete Requests']
 ], 'resize_keyboard': True}
 user = {'keyboard': [
@@ -114,4 +114,10 @@ def make_list(obj_type: ObjectType, objs, prev_page: int, next_page: int):
             'text': '▶️',
             'callback_data': f'{obj_type.value}page:{next_page}'
         })
+    return temp_keyboard
+
+
+def help_keyboard(messages):
+    temp_keyboard = {'keyboard': [messages[i:i + 2] for i in range(0, len(messages), 2)], 'resize_keyboard': True}
+    temp_keyboard['keyboard'].insert(0, per_back['keyboard'][0])
     return temp_keyboard

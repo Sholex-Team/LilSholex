@@ -66,6 +66,7 @@ class User(models.Model):
         ADMIN_EDIT_VOICE = 45, 'Admin Edit Voice',
         ADMIN_EDIT_VOICE_NAME = 46, 'Admin Edit Voice Name',
         ADMIN_EDIT_VOICE_TAGS = 47, 'Admin Edit Voice Tags',
+        ADMIN_FILE_ID = 48, 'Admin File ID'
         USER_MAIN = 19, 'User Main'
         USER_CONTACT_ADMIN = 20, 'User Contact Admin'
         USER_SUGGEST_VOICE_NAME = 21, 'User Suggest Voice Name'
@@ -89,6 +90,7 @@ class User(models.Model):
         USER_MANAGE_PLAYLIST_VOICE = 39, 'User Manager Playlist Voice'
         USER_SUGGEST_VOICE_TAGS = 41, 'User Suggest Voice Tags'
         USER_PRIVATE_VOICE_TAGS = 43, 'User Private Voice Tags'
+        USER_HELP = 49, 'User Help'
 
     user_id = models.AutoField(verbose_name='User ID', primary_key=True, unique=True)
     chat_id = models.BigIntegerField(verbose_name='Chat ID', unique=True)
@@ -96,9 +98,11 @@ class User(models.Model):
     status = models.CharField(max_length=1, choices=Status.choices, default=Status.ACTIVE)
     rank = models.CharField(max_length=1, choices=Rank.choices, default=Rank.USER)
     username = models.CharField(max_length=35, null=True, blank=True)
-    temp_voice_name = models.CharField(max_length=50, null=True)
-    temp_user_id = models.BigIntegerField(null=True)
-    temp_voice_tags = models.ManyToManyField(VoiceTag, 'user_voice_tags', blank=True)
+    temp_voice_name = models.CharField(max_length=50, null=True, verbose_name='Temporary Voice Name')
+    temp_user_id = models.BigIntegerField(null=True, verbose_name='Temporary User ID')
+    temp_voice_tags = models.ManyToManyField(
+        VoiceTag, 'user_voice_tags', blank=True, verbose_name='Temporary Voice Tags'
+    )
     last_usage_date = models.DateTimeField(auto_now=True)
     vote = models.BooleanField(verbose_name='Vote System', default=False)
     date = models.DateTimeField(verbose_name='Register Date', auto_now_add=True)

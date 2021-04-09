@@ -23,7 +23,6 @@ from .types import InvalidVoiceTag, LongVoiceTag, TooManyVoiceTags
 from string import punctuation
 from itertools import combinations
 from django.db.models import Q, Case, When, BooleanField
-from asyncio import iscoroutinefunction
 
 
 class User(Base):
@@ -31,6 +30,7 @@ class User(Base):
     __ads: tuple
     __enforced_rank: Union[models.User.Rank, None]
     __is_inline: bool
+    __async_callbacks: dict
 
     class Mode(Enum):
         NORMAL = 0
@@ -47,6 +47,7 @@ class User(Base):
         self.__mode = mode
         self.__is_inline = is_inline
         super().__init__(settings.MEME, chat_id, instance, session)
+        self.__async_callbacks = {'clear_temp_voice_tags': self.clear_temp_voice_tags}
 
     def __await__(self):
         yield from super().__await__()
@@ -171,7 +172,7 @@ class User(Base):
             splinted_offset = [0] * 4
         if query.startswith('names:'):
             query = query[6:].strip()
-            queries = Q(name__icontains=query[6:].strip())
+            queries = Q(name__icontains=query)
         else:
             if is_tags := query.startswith('tags:'):
                 query = query[5:].strip()
@@ -287,7 +288,7 @@ class User(Base):
             sender=self.database,
             name=self.database.temp_voice_name,
         )
-        new_voice.tags.set(self.database.temp_voice_tags.all())
+        new_voice.tags.set(self.database.temp_voice_tags.all(), clear=True)
         self.database.temp_voice_tags.clear()
 
     @sync_to_async
@@ -316,15 +317,6 @@ class User(Base):
             target_voices.first().delete(dont_send=True)
             return True
 
-    async def send_help(self):
-        async with self._session.get(
-            f'{self._BASE_URL}sendAnimation',
-            params={
-                **self._BASE_PARAM, 'animation': settings.MEME_ANIM, 'caption': self.translate('help_gif')
-            }
-        ) as _:
-            return
-
     @property
     def __back_menu(self):
         try:
@@ -338,11 +330,9 @@ class User(Base):
     
     async def __perform_back_callback(self, callback: str):
         if callback:
-            target_method = getattr(self, callback)
-            if iscoroutinefunction(target_method):
-                await target_method()
-            else:
-                target_method()
+            if target_method := self.__async_callbacks.get(callback):
+                return await target_method()
+            return getattr(self, callback)
 
     async def go_back(self):
         step = self.__back_menu
@@ -375,10 +365,7 @@ class User(Base):
     async def voice_exists(self, message: dict):
         if 'voice' in message and ('mime_type' not in message['voice'] or message['voice']['mime_type'] == 'audio/ogg'):
             return True
-        if self.database.rank == models.User.Rank.USER:
-            await self.send_message(self.translate('send_a_voice'))
-        else:
-            await self.send_message(self.translate('send_a_voice'))
+        await self.send_message(self.translate('send_a_voice'))
 
     @sync_to_async
     def get_playlists(self, page: int):
@@ -554,7 +541,7 @@ class User(Base):
                 sender=self.database,
                 status=status
             )
-            new_voice.tags.set(self.database.temp_voice_tags.all())
+            new_voice.tags.set(self.database.temp_voice_tags.all(), clear=True)
             self.database.temp_voice_tags.clear()
             return new_voice
     
@@ -565,7 +552,7 @@ class User(Base):
     
     @sync_to_async
     def edit_voice_tags(self):
-        self.database.current_voice.tags.set(self.database.temp_voice_tags.all())
+        self.database.current_voice.tags.set(self.database.temp_voice_tags.all(), clear=True)
         self.database.temp_voice_tags.clear()
     
     async def validate_voice_name(self, message: dict):

@@ -8,14 +8,17 @@ from random import randint
 change_permission = ('change',)
 
 
+@admin.display(description='Export as Json')
 def export_json(costume_admin, request, queryset):
     return HttpResponse(serialize('json', queryset), content_type='application/json')
 
 
+@admin.display(description='Playlists Count')
 def count_playlists(obj: models.User):
     return obj.playlists.count()
 
 
+@admin.display(description='Voices Count')
 def count_voices(obj: models.Playlist):
     return obj.voices.count()
 
@@ -28,28 +31,24 @@ def current_voice(obj: models.User):
     return obj.current_voice.name if obj.current_voice else None
 
 
+@admin.display(description='Deny Votes Count')
 def count_deny_votes(obj: models.Voice):
     return obj.deny_vote.count()
 
 
+@admin.display(description='Accept Votes Count')
 def count_accept_votes(obj: models.Voice):
     return obj.accept_vote.count()
 
 
+@admin.display(description='Tags Count')
 def count_tags(obj: models.Voice):
     return obj.tags.count()
 
 
-count_playlists.short_description = 'Playlists Count'
-export_json.short_description = 'Export as Json'
-count_voices.short_description = 'Voices Count'
-count_deny_votes.short_description = 'Deny Votes Count'
-count_accept_votes.short_description = 'Accept Votes Count'
-count_tags.short_description = 'Tags Count'
-
-
 @admin.register(models.User)
 class User(admin.ModelAdmin):
+    @admin.display(description='Ban')
     def ban_user(self, request, queryset):
         result = queryset.update(status='b')
         if result == 0:
@@ -59,6 +58,7 @@ class User(admin.ModelAdmin):
         else:
             self.message_user(request, f'{result} Users have been banned !')
 
+    @admin.display(description='Full Ban')
     def full_ban(self, request, queryset):
         result = queryset.update(status='f')
         if result == 0:
@@ -68,6 +68,7 @@ class User(admin.ModelAdmin):
         else:
             self.message_user(request, f'{result} Users have been banned !')
 
+    @admin.display(description='Unban')
     def unban_user(self, request, queryset):
         result = queryset.update(status='a')
         if result == 0:
@@ -77,9 +78,6 @@ class User(admin.ModelAdmin):
         else:
             self.message_user(request, f'{result} Users have been unbanned .')
 
-    unban_user.short_description = 'Unban'
-    full_ban.short_description = 'Full Ban'
-    ban_user.short_description = 'Ban'
     unban_user.allowed_permissions = change_permission
     ban_user.allowed_permissions = change_permission
     full_ban.allowed_permissions = change_permission
@@ -109,7 +107,8 @@ class User(admin.ModelAdmin):
         'playlists',
         'current_playlist',
         'current_voice',
-        'current_ad'
+        'current_ad',
+        'temp_voice_tags'
     )
     fieldsets = (
         ('Information', {'fields': ('user_id', 'chat_id', 'rank', 'vote', 'username', 'date', 'voice_order')}),
@@ -125,12 +124,14 @@ class User(admin.ModelAdmin):
             'current_ad',
             'last_broadcast'
         )}),
-        ('Voices', {'fields': ('private_voices', 'favorite_voices', 'playlists')})
+        ('Voices', {'fields': ('private_voices', 'favorite_voices', 'playlists')}),
+        ('Temporary Values', {'fields': ('temp_voice_name', 'temp_user_id', 'temp_voice_tags')})
     )
 
 
 @admin.register(models.Voice)
 class Voice(admin.ModelAdmin):
+    @admin.display(description='Accept Votes')
     def accept_vote(self, request, queryset):
         result = [
             (target_voice, target_voice.accept(), delete_vote_sync(target_voice))
@@ -144,6 +145,7 @@ class Voice(admin.ModelAdmin):
         else:
             self.message_user(request, f'{result_len} Voices have been accepted !')
 
+    @admin.display(description='Deny Vote')
     def deny_vote(self, request, queryset):
         result = [
             (target_voice, target_voice.deny(), delete_vote_sync(target_voice))
@@ -159,6 +161,7 @@ class Voice(admin.ModelAdmin):
             else:
                 self.message_user(request, f'{result_len} Voices have been denied !')
 
+    @admin.display(description='Add Fake Deny Votes')
     def add_fake_deny_votes(self, request, queryset):
         if (user_count := models.User.objects.count()) < settings.MIN_FAKE_VOTE:
             fake_min = user_count
@@ -182,9 +185,6 @@ class Voice(admin.ModelAdmin):
         else:
             self.message_user(request, f'Fake votes has been added to {faked_count} voices !')
 
-    accept_vote.short_description = 'Accept Votes'
-    deny_vote.short_description = 'Deny Vote'
-    add_fake_deny_votes.short_description = 'Add Fake Deny Votes'
     add_fake_deny_votes.allowed_permissions = change_permission
     date_hierarchy = 'date'
     list_display = ('voice_id', 'name', 'sender', 'votes', 'status', count_deny_votes, count_accept_votes, count_tags)

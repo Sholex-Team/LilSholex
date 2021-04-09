@@ -14,12 +14,12 @@ with open(SECRETS_PATH / 'persianmeme_token') as persian_meme_token:
     MEME = persian_meme_token.read().removesuffix('\n')
 with open(SECRETS_PATH / 'persianmeme_channel') as persian_meme_channel:
     MEME_CHANNEL = persian_meme_channel.read().removesuffix('\n')
-with open(SECRETS_PATH / 'persianmeme_anim') as persian_meme_anim:
-    MEME_ANIM = persian_meme_anim.read().removesuffix('\n')
 with open(SECRETS_PATH / 'persianmeme_logs') as persian_meme_logs:
     MEME_LOGS = persian_meme_logs.read().removesuffix('\n')
 with open(SECRETS_PATH / 'persianmeme_messages') as persian_meme_messages:
     MEME_MESSAGES = persian_meme_messages.read().removesuffix('\n')
+with open(SECRETS_PATH / 'persianmeme_help_messages') as persian_meme_help_messages:
+    MEME_HELP_MESSAGES = persian_meme_help_messages.read()
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 with open(SECRETS_PATH / 'domain') as domain_file:

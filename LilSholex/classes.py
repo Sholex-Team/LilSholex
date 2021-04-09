@@ -40,24 +40,21 @@ class Base(ABC):
     async def send_message(
             self,
             text: str,
-            reply_markup: dict = '',
-            reply_to_message_id: int = '',
+            reply_markup: dict = str(),
+            reply_to_message_id: int = str(),
             parse_mode: str = None,
             disable_web_page_preview: bool = True,
     ) -> int:
-
         if reply_markup:
             reply_markup = json.dumps(reply_markup)
-        else:
-            reply_markup = ''
-        encoded = {'text': text, 'reply_markup': reply_markup}
         async with self._session.get(
             f'{self._BASE_URL}sendMessage',
             params={
                 **self._BASE_PARAM,
-                **encoded,
+                'text': text,
+                'reply_markup': reply_markup,
                 'reply_to_message_id': reply_to_message_id,
-                'parse_mode': parse_mode if parse_mode else '',
+                'parse_mode': parse_mode if parse_mode else str(),
                 'disable_web_page_preview': str(disable_web_page_preview)
             }
         ) as response:
@@ -75,13 +72,34 @@ class Base(ABC):
             return
 
     @async_fix
-    async def edit_message_text(self, message_id: int, text: str, inline_keyboard: dict = ''):
+    async def edit_message_text(self, message_id: int, text: str, inline_keyboard: dict = str()):
         if inline_keyboard:
             inline_keyboard = json.dumps(inline_keyboard)
         async with self._session.get(
             f'{self._BASE_URL}editMessageText',
             params={**self._BASE_PARAM, 'message_id': message_id, 'text': text, 'reply_markup': inline_keyboard}
         ) as _:
+            return
+
+    @async_fix
+    async def send_animation(
+            self,
+            animation: str,
+            caption: str = str(),
+            reply_markup: dict = str(),
+            reply_to_message_id: int = str(),
+            parse_mode: str = str()
+    ):
+        if reply_markup:
+            reply_markup = json.dumps(reply_markup)
+        async with self._session.get(f'{self._BASE_URL}sendAnimation', params={
+            **self._BASE_PARAM,
+            'animation': animation,
+            'caption': caption,
+            'reply_markup': reply_markup,
+            'reply_to_message_id': reply_to_message_id,
+            'parse_mode': parse_mode
+        }):
             return
 
     @sync_to_async

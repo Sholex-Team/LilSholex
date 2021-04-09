@@ -69,7 +69,10 @@ admin_messages = {
     'edit_voice_tags': 'Send new voice tags.',
     'voice_name_edited': 'Voice name has been edited ✔️',
     'voice_tags_edited': 'Voice tags have been edited ✔️',
-    'invalid_voice_name': 'Voice name is invalid ⚠️'
+    'invalid_voice_name': 'Voice name is invalid ⚠️',
+    'send_file_id': 'Send a document to get it\'s file ID.',
+    'file_id': 'Here is the document file ID 👇\n\n{0}',
+    'no_document': 'Your message does not contain any document !'
 }
 user_messages = {
     'back': 'شما به منوی اصلی بازگشتید 🔙',
@@ -154,7 +157,7 @@ user_messages = {
     'deleted_from_playlist': 'ویس مورد نظر از پلی لیست حذف شد !',
     'not_in_playlist': 'ویس مورد نظر در پلی لیست قرار ندارد ⚠️',
     'playlist_link': ' لینک ورود به پلی لیست {0}\nدعوت شده اید !\nبرای عضویت بر لینک زیر کلیک کنید 👇\n{1}',
-    'help_gif': 'گیف راهنما 👆',
+    'help': 'برای دریافت راهنما یکی از بخش های زیر را انتخاب کنید 👇',
     'send_a_voice': 'لطفا یک ویس ارسال کنید ⚠️',
     'no_voice': 'ویسی وجود ندارد ⚠️',
     'deleted_by_admins': 'ویس {0} توسط ادمین های ربات پاک شد 🚮',

@@ -15,7 +15,6 @@ import asyncio
 from django import db
 from .keyboards import numbers
 from .types import ObjectType
-from string import punctuation
 
 
 @sync_to_async

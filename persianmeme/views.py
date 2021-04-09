@@ -15,6 +15,7 @@ import json
 from aiohttp import ClientSession
 from .types import ObjectType
 from django.forms import ValidationError
+from django.conf import settings
 
 
 async def webhook(request):
@@ -245,7 +246,8 @@ async def webhook(request):
                     'Accept Voice',
                     'Deny Voice',
                     'Get Voice',
-                    'Edit Voice'
+                    'Edit Voice',
+                    'File ID'
                 )):
                     if text == admin_options[0]:
                         user.database.menu = user.database.Menu.ADMIN_GET_USER
@@ -278,23 +280,26 @@ async def webhook(request):
                             )
                     elif text == admin_options[6]:
                         user.database.menu = user.database.Menu.ADMIN_BAN_VOTE
-                        await user.send_message(user.translate('send_a_voice'), keyboards.en_back)
+                        await user.send_message(user.translate('voice'), keyboards.en_back)
                     elif text == admin_options[7]:
                         user.database.menu = user.database.Menu.ADMIN_ACCEPT_VOICE
-                        await user.send_message(user.translate('send_a_voice'), keyboards.en_back)
+                        await user.send_message(user.translate('voice'), keyboards.en_back)
                     elif text == admin_options[8]:
                         user.database.menu = user.database.Menu.ADMIN_DENY_VOICE
-                        await user.send_message(user.translate('send_a_voice'), keyboards.en_back)
+                        await user.send_message(user.translate('voice'), keyboards.en_back)
                     elif text == admin_options[9]:
                         user.database.menu = user.database.Menu.ADMIN_GET_VOICE
                         await user.send_message(
                             user.translate('send_voice_id'), keyboards.en_back
                         )
-                    else:
+                    elif text == admin_options[10]:
                         user.database.menu = user.database.Menu.ADMIN_SEND_EDIT_VOICE
                         await user.send_message(
                             user.translate('send_edit_voice'), keyboards.en_back
                         )
+                    else:
+                        user.database.menu = user.database.Menu.ADMIN_FILE_ID
+                        await user.send_message(user.translate('send_file_id'), keyboards.en_back)
                 # Owner Section
                 elif user.database.rank == user.database.Rank.OWNER and text in (owner_options := (
                     'Message User',
@@ -531,6 +536,16 @@ async def webhook(request):
                     await user.edit_voice_tags()
                     await user.send_message(user.translate('voice_tags_edited'), reply_to_message_id=message_id)
                     await user.go_back()
+            elif user.database.menu == user.database.Menu.ADMIN_FILE_ID:
+                if message.get('document'):
+                    user.database.menu = user.database.Menu.ADMIN_MAIN
+                    await user.send_message(
+                        user.translate('file_id', message['document']['file_id']),
+                        keyboards.owner,
+                        message_id
+                    )
+                else:
+                    await user.send_message(user.translate('no_document'), reply_to_message_id=message_id)
         elif user.database.status == user.database.Status.ACTIVE and \
                 (user.database.rank == user.database.Rank.USER or
                  user.database.menu_mode == user.database.MenuMode.USER):
@@ -554,7 +569,11 @@ async def webhook(request):
             elif user.database.menu == user.database.Menu.USER_MAIN:
                 user.database.back_menu = 'main'
                 if text == 'راهنما 🔰':
-                    await user.send_help()
+                    user.database.menu = user.database.Menu.USER_HELP
+                    await user.send_message(
+                        user.translate('help'),
+                        keyboards.help_keyboard(list(json.loads(settings.MEME_HELP_MESSAGES).keys()))
+                    )
                 elif text == 'دیسکورد':
                     await user.send_message(
                         user.translate('discord'), keyboards.discord, message_id
@@ -887,6 +906,12 @@ async def webhook(request):
                 elif text == 'گوش دادن به ویس 🎧':
                     file_id, name = await user.voice_info
                     await user.send_voice(file_id, name)
+                else:
+                    await user.send_message(user.translate('unknown_command'))
+            elif user.database.menu == user.database.Menu.USER_HELP:
+                help_messages = json.loads(settings.MEME_HELP_MESSAGES)
+                if text in help_messages:
+                    await user.send_animation(**help_messages[text], reply_to_message_id=message_id)
                 else:
                     await user.send_message(user.translate('unknown_command'))
         await user.save()
