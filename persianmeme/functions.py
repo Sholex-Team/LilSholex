@@ -103,7 +103,7 @@ async def delete_vote_async(message_id: int, session: ClientSession):
 
 @sync_to_async
 def check_voice(file_unique_id: str):
-    target_voice = models.Voice.objects.filter(file_unique_id=file_unique_id, status=models.Voice.Type.PRIVATE)
+    target_voice = models.Voice.objects.filter(file_unique_id=file_unique_id, status=models.Voice.Status.PENDING)
     if target_voice.exists():
         return target_voice.first()
 

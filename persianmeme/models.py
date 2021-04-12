@@ -107,7 +107,6 @@ class User(models.Model):
     vote = models.BooleanField(verbose_name='Vote System', default=False)
     date = models.DateTimeField(verbose_name='Register Date', auto_now_add=True)
     voice_order = models.CharField(max_length=9, choices=VoiceOrder.choices, default=VoiceOrder.new_voice_id)
-    private_voices = models.ManyToManyField('Voice', 'private_voices', blank=True)
     favorite_voices = models.ManyToManyField('Voice', 'favorite_voices', blank=True)
     back_menu = models.CharField(max_length=50, null=True, blank=True)
     started = models.BooleanField('Started', default=False)

@@ -101,7 +101,6 @@ class User(admin.ModelAdmin):
     readonly_fields = ('user_id', 'date', 'last_usage_date')
     actions = (unban_user, full_ban, ban_user, export_json)
     raw_id_fields = (
-        'private_voices',
         'favorite_voices',
         'last_broadcast',
         'playlists',
@@ -124,7 +123,7 @@ class User(admin.ModelAdmin):
             'current_ad',
             'last_broadcast'
         )}),
-        ('Voices', {'fields': ('private_voices', 'favorite_voices', 'playlists')}),
+        ('Voices', {'fields': ('favorite_voices', 'playlists')}),
         ('Temporary Values', {'fields': ('temp_voice_name', 'temp_user_id', 'temp_voice_tags')})
     )
 

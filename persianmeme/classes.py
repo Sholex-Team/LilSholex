@@ -194,16 +194,14 @@ class User(Base):
                     queries
                 ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct()
             ],
-            lambda: self.database.private_voices.all().filter(
-                queries
+            lambda: models.Voice.objects.filter(
+                queries & Q(sender=self.database) & Q(voice_type=models.Voice.Type.PRIVATE)
             ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct(),
             lambda: self.database.favorite_voices.all().filter(
                 queries & Q(status__in=models.PUBLIC_STATUS)
             ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct(),
             lambda: models.Voice.objects.filter(
-                queries &
-                Q(status__in=models.PUBLIC_STATUS) &
-                Q(voice_type=models.Voice.Type.NORMAL)
+                queries & Q(status__in=models.PUBLIC_STATUS) & Q(voice_type=models.Voice.Type.NORMAL)
             ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct()
         )
         results = []
@@ -269,27 +267,35 @@ class User(Base):
         voice.voters.remove(self.database)
 
     @sync_to_async
-    def private_user_count(self):
-        return self.database.private_voices.count()
+    def private_voices_count(self):
+        return models.Voice.objects.filter(voice_type=models.Voice.Type.PRIVATE, sender=self.database).count()
 
     @sync_to_async
-    def delete_private_voice(self, voice: models.Voice):
-        if voice in self.database.private_voices.all():
-            voice.delete(dont_send=True)
+    def delete_private_voice(self, file_unique_id: str):
+        if (result := models.Voice.objects.filter(
+                voice_type=models.Voice.Type.PRIVATE, sender=self.database, file_unique_id=file_unique_id
+        )).exists():
+            result.delete()
             return True
+        return False
 
     @sync_to_async
     def create_private_voice(self, message: dict):
-        new_voice = self.database.private_voices.create(
+        if models.Voice.objects.filter(Q(file_unique_id=message['voice']['file_unique_id']) & (
+                Q(voice_type=models.Voice.Type.NORMAL) |
+                (Q(voice_type=models.Voice.Type.PRIVATE) & Q(sender=self.database))
+        )).exists():
+            return False
+        models.Voice.objects.create(
             file_id=message['voice']['file_id'],
             file_unique_id=message['voice']['file_unique_id'],
             status=models.Voice.Status.ACTIVE,
             voice_type=models.Voice.Type.PRIVATE,
             sender=self.database,
             name=self.database.temp_voice_name,
-        )
-        new_voice.tags.set(self.database.temp_voice_tags.all(), clear=True)
+        ).tags.set(self.database.temp_voice_tags.all(), clear=True)
         self.database.temp_voice_tags.clear()
+        return True
 
     @sync_to_async
     def add_favorite_voice(self, voice: models.Voice):

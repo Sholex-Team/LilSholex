@@ -741,7 +741,7 @@ async def webhook(request):
                         await owner.send_message('New delete request 🗑')
             elif user.database.menu == user.database.Menu.USER_PRIVATE_VOICES:
                 if text == 'افزودن ⏬':
-                    if await user.private_user_count() <= 120:
+                    if await user.private_voices_count() <= 120:
                         user.database.menu = user.database.Menu.USER_PRIVATE_VOICE_NAME
                         user.database.back_menu = 'private'
                         await user.send_message(user.translate('voice_name'), keyboards.per_back)
@@ -769,8 +769,7 @@ async def webhook(request):
                     await user.send_message(user.translate('send_voice'))
             elif user.database.menu == user.database.Menu.USER_PRIVATE_VOICE:
                 if await user.voice_exists(message):
-                    if not await functions.get_voice(message['voice']['file_unique_id']):
-                        await user.create_private_voice(message)
+                    if await user.create_private_voice(message):
                         user.database.menu = user.database.Menu.USER_PRIVATE_VOICES
                         user.database.back_menu = 'main'
                         await user.send_message(user.translate('private_voice_added'), keyboards.private)
@@ -778,13 +777,12 @@ async def webhook(request):
                         await user.send_message(user.translate('voice_exists'))
             elif user.database.menu == user.database.Menu.USER_DELETE_PRIVATE_VOICE:
                 if await user.voice_exists(message):
-                    if current_voice := await user.get_public_voice(message):
-                        if await user.delete_private_voice(current_voice):
-                            user.database.menu = user.database.Menu.USER_PRIVATE_VOICES
-                            user.database.back_menu = 'main'
-                            await user.send_message(user.translate('voice_deleted'), keyboards.private)
-                        else:
-                            await user.send_message(user.translate('voice_is_not_yours'))
+                    if await user.delete_private_voice(message['voice']['file_unique_id']):
+                        user.database.menu = user.database.Menu.USER_PRIVATE_VOICES
+                        user.database.back_menu = 'main'
+                        await user.send_message(user.translate('voice_deleted'), keyboards.private)
+                    else:
+                        await user.send_message(user.translate('voice_is_not_yours'))
             elif user.database.menu == user.database.Menu.USER_FAVORITE_VOICES:
                 if text == 'افزودن ⏬':
                     if await user.count_favorite_voices() <= 30:
