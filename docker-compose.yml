@@ -300,7 +300,6 @@ services:
       - db_django
     deploy:
       replicas: 1
-      mode: replicated-job
       update_config:
         parallelism: 1
         delay: 5s
