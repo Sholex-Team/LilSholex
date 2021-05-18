@@ -90,10 +90,7 @@ class User(admin.ModelAdmin):
         'status',
         'date',
         'username',
-        'menu_mode',
-        count_playlists,
-        current_playlist,
-        current_voice
+        'menu_mode'
     )
     list_filter = ('status', 'rank', 'vote', 'started', 'voice_order', 'menu_mode')
     list_per_page = 15

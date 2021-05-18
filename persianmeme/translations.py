@@ -48,7 +48,7 @@ admin_messages = {
     'admin_voice_accepted': 'Voice has been accepted !',
     'send_voice_id': 'Please send a voice ID to receive the voice file.',
     'requested_voice': 'Your requested voice 👆',
-    'vote_before': 'You have voted this voice before !\nVotes will get updated every 5 minutes 🔄',
+    'vote_before': 'You have voted this voice before !\nVotes will get updated every 3 minutes 🔄',
     'voted': 'Your vote has been submitted ✔️',
     'not_voted': 'You haven\'t voted yet !',
     'voice_voted': 'You have voted this voice 👍',
@@ -72,15 +72,15 @@ admin_messages = {
     'invalid_voice_name': 'Voice name is invalid ⚠️',
     'send_file_id': 'Send a document to get it\'s file ID.',
     'file_id': 'Here is the document file ID 👇\n\n{0}',
-    'no_document': 'Your message does not contain any document !'
+    'no_document': 'Your message does not contain any document !',
+    'start_the_bot': 'In order to use the bot, click here ✅'
 }
 user_messages = {
     'back': 'شما به منوی اصلی بازگشتید 🔙',
     'voice_name': 'لطفا نام ویس را ارسال کنید !',
     'choices': 'یکی از گزینه هارا انتخاب کنید',
-    'start_bot_title': 'برای دسترسی به ویس ها ابتدا ربات را استارت کنید .',
-    'start_bot': 'برای استفاده از ویس ها بر روی دکمه زیر کلیک کرده و ربات را استارت کنید 👇',
-    'vote_before': 'شما قبلا به این ویس رای داده اید ⚠️\nنتایج هر ۵ دقیقه به روزرسانی می شوند 🔄',
+    'start_the_bot': 'برای استفاده از ربات کلیک کنید ✔️',
+    'vote_before': 'شما قبلا به این ویس رای داده اید ⚠️\nنتایج هر ۳ دقیقه به روزرسانی می شوند 🔄',
     'voted': 'رای شما ثبت شد ✔️',
     'donate': '''برای حمایت مالی از ما می توانید از روش های زیر استفاده کنید 👇
 
@@ -97,6 +97,8 @@ user_messages = {
     Litecoin: `Lc7rPW4vgbeKwEYQw7gt7kmJ1grY9vWvoR`
 
     از حمایت های شما مچکریم 🙏''',
+    'managing_playlist': 'مدیریت پلی لیست ⚙️',
+    'managing_voice': 'مدیریت ویس ⚙️',
     'manage_playlists': 'مدیریت پلی لیست ها 👇',
     'manage_playlist': 'مدیریت پلی لیست 👇',
     'manage_voice': 'مدیریت ویس 👇',
@@ -113,7 +115,7 @@ user_messages = {
     'joined_playlist': 'شما با موفقیت عضو پلی لیست {0} شدید !',
     'already_joined_playlist': 'شما در حال حاضر در این پلی لیست عضو هستید !',
     'invalid_playlist': 'پلی لیست معتبر نیست ⚠️',
-    'welcome': 'به ربات Persian Meme خوش آمدید 😁',
+    'welcome': 'به ربات Persian Meme خوش آمدید 😁\n\nبرای مشاهده ی راهنمای ربات روی دکمه ی "راهنما 🔰" کلیک کنید ☑️',
     'discord': 'با کلیک بر دکمه زیر وارد سرور دیسکورد ما شوید 👇',
     'voting_voice': 'لطفا ویس در حال رای گیری را ارسال کنید.',
     'group': 'از طریق دکمه زیر وارد گروه شوید 👇',

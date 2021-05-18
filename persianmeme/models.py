@@ -98,8 +98,8 @@ class User(models.Model):
     status = models.CharField(max_length=1, choices=Status.choices, default=Status.ACTIVE)
     rank = models.CharField(max_length=1, choices=Rank.choices, default=Rank.USER)
     username = models.CharField(max_length=35, null=True, blank=True)
-    temp_voice_name = models.CharField(max_length=50, null=True, verbose_name='Temporary Voice Name')
-    temp_user_id = models.BigIntegerField(null=True, verbose_name='Temporary User ID')
+    temp_voice_name = models.CharField(max_length=50, null=True, verbose_name='Temporary Voice Name', blank=True)
+    temp_user_id = models.BigIntegerField(null=True, verbose_name='Temporary User ID', blank=True)
     temp_voice_tags = models.ManyToManyField(
         VoiceTag, 'user_voice_tags', blank=True, verbose_name='Temporary Voice Tags'
     )
@@ -311,7 +311,7 @@ class Broadcast(models.Model):
 
     class Meta:
         db_table = 'persianmeme_broadcasts'
-        ordering = ['-id']
+        ordering = ['id']
 
 
 class Playlist(models.Model):

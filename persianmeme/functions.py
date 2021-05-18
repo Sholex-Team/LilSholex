@@ -3,11 +3,8 @@ from LilSholex import decorators
 from LilSholex.functions import answer_callback_query as answer_callback_query_closure
 from . import models
 import requests
-import json
-from uuid import uuid4
 from .models import Broadcast
 from .translations import user_messages
-from .keyboards import bot
 from asgiref.sync import sync_to_async
 from aiohttp import ClientSession, TCPConnector, ClientError
 from django.core.paginator import Paginator
@@ -69,6 +66,8 @@ async def answer_inline_query(
         next_offset: str,
         cache_time: float,
         is_personal: bool,
+        switch_pm_text: str,
+        switch_pm_parameter: str,
         session: ClientSession
 ):
     async with session.get(
@@ -78,9 +77,11 @@ async def answer_inline_query(
             'next_offset': next_offset,
             'cache_time': cache_time,
             'is_personal': str(is_personal),
+            'switch_pm_text': switch_pm_text,
+            'switch_pm_parameter': switch_pm_parameter,
             'inline_query_id': inline_query_id
         }
-    ) as _:
+    ):
         return
 
 
@@ -143,16 +144,6 @@ def get_delete_requests():
     return tuple(models.Delete.objects.all())
 
 
-def start_bot_first():
-    return json.dumps([{
-        'type': 'article',
-        'id': 'error',
-        'title': user_messages['start_bot_title'],
-        'input_message_content': {'message_text': user_messages['start_bot']},
-        'reply_markup': bot
-    }])
-
-
 @sync_to_async
 def get_all_accepted():
     return tuple(models.Voice.objects.filter(status=models.Voice.Status.SEMI_ACTIVE))
@@ -206,26 +197,26 @@ async def perform_broadcast(broadcast: Broadcast):
                 await asyncio.sleep(0.7)
 
 
-def make_like_result(voices, offset: int, limit: int):
-    return [{
+def make_like_result(voice):
+    return {
         'type': 'voice',
-        'id': str(uuid4()),
-        'voice_file_id': voice.file_id,
-        'title': voice.name,
+        'id': voice['voice_id'],
+        'voice_file_id': voice['file_id'],
+        'title': voice['name'],
         'reply_markup': {'inline_keyboard': [
-            [{'text': '👍', 'callback_data': f'up:{voice.voice_id}'},
-             {'text': '👎', 'callback_data': f'down:{voice.voice_id}'}]
+            [{'text': '👍', 'callback_data': f'up:{voice["voice_id"]}'},
+             {'text': '👎', 'callback_data': f'down:{voice["voice_id"]}'}]
         ]}
-    } for voice in voices[offset:offset + limit]]
+    }
 
 
-def make_result(voices, offset: int, limit: int):
-    return [{
+def make_result(voice):
+    return {
         'type': 'voice',
-        'id': str(uuid4()),
-        'voice_file_id': voice.file_id,
-        'title': voice.name
-    } for voice in voices[offset:offset + limit]]
+        'id': voice['voice_id'],
+        'voice_file_id': voice['file_id'],
+        'title': voice['name']
+    }
 
 
 def make_list_string(object_type: ObjectType, objs: tuple):

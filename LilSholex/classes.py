@@ -28,7 +28,7 @@ class Base(ABC):
             assert self._instance, 'Instance must be passed when chat id isn\'t !'
             self.database = self._instance
         else:
-            self.database, created = yield from self.get_user().__await__()
+            self.database = yield from self.get_user().__await__()
         self._BASE_PARAM = {'chat_id': self.database.chat_id}
         return self
 

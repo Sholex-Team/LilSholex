@@ -5,15 +5,14 @@ from zoneinfo import ZoneInfo
 from background_task.models import CompletedTask
 
 
-@background(schedule=14400)
+@background(schedule=21600)
 def check_voice(voice_id: int):
     CompletedTask.objects.all().delete()
     try:
         voice = Voice.objects.get(voice_id=voice_id, status='p')
     except Voice.DoesNotExist:
         return
-    aware_date = voice.last_check.astimezone(ZoneInfo('Asia/Tehran'))
-    if 0 < aware_date.hour < 8:
+    if 0 < voice.last_check.astimezone(ZoneInfo('Asia/Tehran')).hour < 8:
         voice.save()
         return check_voice(voice_id)
     accept_count = voice.accept_vote.count()
@@ -28,7 +27,7 @@ def check_voice(voice_id: int):
             voice.deny()
 
 
-@background(schedule=300)
+@background(schedule=180)
 def update_votes(voice_id: int):
     try:
         voice = Voice.objects.get(voice_id=voice_id, status=Voice.Status.PENDING)

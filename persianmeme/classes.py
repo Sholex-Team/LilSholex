@@ -60,10 +60,10 @@ class User(Base):
 
     @sync_to_async
     def get_user(self):
-        result = models.User.objects.get_or_create(chat_id=self.chat_id)
+        user = models.User.objects.get_or_create(chat_id=self.chat_id)[0]
         if self.__mode == self.Mode.SEND_AD:
-            self.__ads = tuple(models.Ad.objects.exclude(seen=result[0]))
-        return result
+            self.__ads = tuple(models.Ad.objects.exclude(seen=user))
+        return user
 
     @sync_to_async
     def delete_semi_active(self, file_unique_id: str):
@@ -190,17 +190,17 @@ class User(Base):
         result_sets = (
             lambda: [
                 voice for playlist in self.database.playlists.prefetch_related('voices')
-                for voice in playlist.voices.filter(
+                for voice in playlist.voices.values('voice_id', 'file_id', 'name').filter(
                     queries
                 ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct()
             ],
-            lambda: models.Voice.objects.filter(
+            lambda: models.Voice.objects.values('voice_id', 'file_id', 'name').filter(
                 queries & Q(sender=self.database) & Q(voice_type=models.Voice.Type.PRIVATE)
             ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct(),
-            lambda: self.database.favorite_voices.all().filter(
+            lambda: self.database.favorite_voices.values('voice_id', 'file_id', 'name').all().filter(
                 queries & Q(status__in=models.PUBLIC_STATUS)
             ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct(),
-            lambda: models.Voice.objects.filter(
+            lambda: models.Voice.objects.values('voice_id', 'file_id', 'name').filter(
                 queries & Q(status__in=models.PUBLIC_STATUS) & Q(voice_type=models.Voice.Type.NORMAL)
             ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct()
         )
@@ -210,13 +210,15 @@ class User(Base):
         for result, current_offset in zip(result_sets, range(4)):
             if splinted_offset[current_offset] != 'e':
                 splinted_offset[current_offset] = int(splinted_offset[current_offset])
-                temp_result = result_maker(result(), splinted_offset[current_offset], remaining)
+                current_result = result()[splinted_offset[current_offset]:splinted_offset[current_offset] + remaining]
+                temp_result = [result_maker(voice) for voice in current_result
+                               if all(voice['voice_id'] != target_result['id'] for target_result in results)]
                 if not (temp_len := len(temp_result)):
                     splinted_offset[current_offset] = 'e'
                 else:
-                    splinted_offset[current_offset] += temp_len
+                    splinted_offset[current_offset] += len(current_result)
                 results.extend(temp_result)
-                remaining = 50 - len(results)
+                remaining -= temp_len
                 if not remaining:
                     break
         return results, ':'.join(map(lambda item: str(item), splinted_offset))
@@ -349,14 +351,14 @@ class User(Base):
         await self.save()
 
     @async_fix
-    async def record_audio(self):
+    async def upload_voice(self):
         now = datetime.now()
         if self.database.started and self.database.last_start and \
                 (now - self.database.last_start) <= timedelta(seconds=18000):
             return
         while True:
             async with self._session.get(
-                    f'{self._BASE_URL}sendChatAction', params={**self._BASE_PARAM, 'action': 'record_audio'}
+                    f'{self._BASE_URL}sendChatAction', params={**self._BASE_PARAM, 'action': 'upload_voice'}
             ) as response:
                 if response.status != 429:
                     self.database.started = response.status == 200

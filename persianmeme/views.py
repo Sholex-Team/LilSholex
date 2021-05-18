@@ -25,11 +25,18 @@ async def webhook(request):
         offset = update['inline_query']['offset']
         inline_query_id = update['inline_query']['id']
         user = await classes.User(request.http_session, classes.User.Mode.SEND_AD, update['inline_query']['from']['id'])
-        await user.record_audio()
+        await user.upload_voice()
         if not user.database.started:
             await user.save()
             await functions.answer_inline_query(
-                inline_query_id, functions.start_bot_first(), '', 0, True, request.http_session
+                inline_query_id,
+                str(),
+                str(),
+                0,
+                True,
+                user.translate('start_the_bot'),
+                'new_user',
+                request.http_session
             )
             return HttpResponse(status=200)
         await user.send_ad()
@@ -38,7 +45,7 @@ async def webhook(request):
         if user.database.status != 'f':
             results, next_offset = await user.get_voices(query, offset)
             await functions.answer_inline_query(
-                inline_query_id, json.dumps(results), next_offset, 300, True, request.http_session
+                inline_query_id, json.dumps(results), next_offset, 300, True, str(), str(), request.http_session
             )
     elif 'callback_query' in update:
         answer_query = functions.answer_callback_query(request.http_session)
@@ -49,7 +56,7 @@ async def webhook(request):
         inliner = await classes.User(
             request.http_session, classes.User.Mode.SEND_AD, callback_query['from']['id'], is_inline=True
         )
-        await inliner.record_audio()
+        await inliner.upload_voice()
         if not inliner.database.started:
             await answer_query(query_id, inliner.translate('start_to_use'), True)
             await inliner.save()
@@ -88,6 +95,7 @@ async def webhook(request):
                     return HttpResponse(status=200)
                 inliner.database.menu = inliner.database.Menu.USER_MANAGE_PLAYLIST
                 inliner.database.back_menu = 'manage_playlists'
+                await answer_query(query_id, inliner.translate('managing_playlist'), False)
                 await inliner.send_message(inliner.translate('manage_playlist'), keyboards.manage_playlist)
             else:
                 try:
@@ -99,6 +107,7 @@ async def webhook(request):
                     return HttpResponse(status=200)
                 inliner.database.menu = inliner.database.Menu.USER_MANAGE_PLAYLIST_VOICE
                 inliner.database.back_menu = 'manage_playlist'
+                await answer_query(query_id, inliner.translate('managing_voice'), False)
                 await inliner.send_message(inliner.translate('manage_voice'), keyboards.manage_voice)
         elif callback_data[0] in (message_options := ('read', 'ban', 'reply')):
             await inliner.delete_message(message_id)
@@ -550,7 +559,7 @@ async def webhook(request):
                 (user.database.rank == user.database.Rank.USER or
                  user.database.menu_mode == user.database.MenuMode.USER):
             if text and text.startswith('/start'):
-                if len(splinted_text := text.split(' ')) == 2:
+                if len(splinted_text := text.split(' ')) == 2 and splinted_text[1] != 'new_user':
                     try:
                         if result := await user.join_playlist(splinted_text[1]):
                             await user.send_message(
