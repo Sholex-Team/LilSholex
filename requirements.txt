@@ -44,7 +44,7 @@ toml==0.10.2
 Twisted==21.2.0
 txaio==21.2.1
 typing-extensions==3.10.0.0
-urllib3==1.26.4
+urllib3==1.26.5
 wrapt==1.12.1
 yarl==1.6.3
 zope.interface==5.4.0
