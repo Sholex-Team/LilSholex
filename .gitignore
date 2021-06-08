@@ -6,3 +6,4 @@
 *build*
 venv
 *.sqlite3
+static/admin

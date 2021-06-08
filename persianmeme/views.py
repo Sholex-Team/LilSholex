@@ -605,9 +605,9 @@ async def webhook(request):
                     )
                 elif text == 'آخرین ویس ها 🆕':
                     voices_str = ''
-                    for voice in (await filter_by_ordering(
-                            models.Voice, '-voice_id', status__in=models.PUBLIC_STATUS, voice_type='n'
-                    ))[:15]:
+                    for voice in await filter_by_ordering(
+                            models.Voice, '-voice_id', 15, status__in=models.PUBLIC_STATUS, voice_type='n'
+                    ):
                         voices_str += f'⭕ {voice.name}\n'
                     await user.send_message(voices_str)
                 elif text == 'ارتباط با مدیریت 📬':
@@ -629,7 +629,7 @@ async def webhook(request):
                     )
                 elif text == 'ویس های محبوب 👌':
                     voices_str = ''
-                    for voice in (await get_by_ordering(models.Voice, '-votes'))[:15]:
+                    for voice in await get_by_ordering(models.Voice, '-votes', 15):
                         voices_str += f'⭕ {voice.name}\n'
                     await user.send_message(voices_str)
                 elif text == 'امتیازدهی ⭐':

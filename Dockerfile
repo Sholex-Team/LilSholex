@@ -1,4 +1,4 @@
-FROM python:3.9.2
+FROM python:3.9.5
 # Addding requirements
 COPY requirements.txt requirements.txt
 RUN pip install -U pip && pip install -r requirements.txt --no-cache-dir

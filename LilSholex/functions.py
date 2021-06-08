@@ -41,13 +41,13 @@ def get_related_obj(queryset, **kwargs):
 
 
 @sync_to_async
-def filter_by_ordering(model, order_type, **kwargs):
-    return tuple(model.objects.filter(**kwargs).order_by(order_type))
+def filter_by_ordering(model, order_type: str, count: int, **kwargs):
+    return tuple(model.objects.filter(**kwargs).order_by(order_type)[:count])
 
 
 @sync_to_async
-def get_by_ordering(model, order_type):
-    return tuple(model.objects.order_by(order_type))
+def get_by_ordering(model, order_type: str, count: int):
+    return tuple(model.objects.order_by(order_type)[:count])
 
 
 @sync_to_async

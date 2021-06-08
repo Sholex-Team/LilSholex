@@ -1,7 +1,7 @@
 version: "3.8"
 services:
   db:
-    image: mysql:8.0.23
+    image: mysql:8.0.25
     command: --default-authentication-plugin=mysql_native_password
     environment:
         MYSQL_ROOT_PASSWORD_FILE: "/run/secrets/db_password"
@@ -87,9 +87,6 @@ services:
         failure_action: pause
         monitor: 10s
         order: stop-first
-    configs:
-      - source: nginx
-        target: /etc/nginx/nginx.conf
     secrets:
       - ssl_certificate
       - ssl_key
@@ -285,7 +282,8 @@ services:
         target: /home/sholex/persianmeme/migrations
   migrations:
     image: docker.pkg.github.com/sholex-team/lilsholex/lilsholex:latest
-    command: bash -c "yes | python manage.py makemigrations persianmeme && yes | python manage.py migrate"
+    command: "bash -c 'yes | python manage.py makemigrations persianmeme && yes | python manage.py migrate &&\
+    python manage.py collectstatic --noinput'"
     secrets:
       - db_password
       - secret_key
@@ -303,7 +301,7 @@ services:
       update_config:
         parallelism: 1
         delay: 5s
-        failure_action: rollback
+        failure_action: pause
         monitor: 10s
         order: stop-first
       rollback_config:
@@ -362,6 +360,3 @@ secrets:
     file: ./ssl/dhparam.pem
   domain:
     external: true
-configs:
-  nginx:
-    file: conf/nginx.conf

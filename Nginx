@@ -1,7 +1,7 @@
 FROM ubuntu:groovy
-ARG NGINX_VERSION=nginx-1.20.0
+ARG NGINX_VERSION=nginx-1.20.1
 # Compiling
-RUN apt update && apt install -y build-essential \
+RUN apt update && DEBIAN_FRONTEND="noninteractive" apt install -y build-essential \
 openssl libpcre3 libpcre3-dev zlib1g zlib1g-dev libssl-dev python3.9 python3-pip wget \
 && apt autoremove -y && apt autoclean
 RUN python3.9 -m pip install --no-cache-dir requests
@@ -13,8 +13,9 @@ cd $NGINX_VERSION && ./configure --http-log-path=/var/log/nginx/access.log --err
 --with-http_v2_module --with-http_ssl_module --with-http_realip_module --with-http_gzip_static_module \
 --sbin-path=/usr/bin/nginx && make && make install && \
 cd .. && rm -r $NGINX_VERSION*
-# Adding Health Checks
-ADD healthchecks/nginx.py nginx.py
+# Adding Files
+COPY healthchecks/nginx.py nginx.py
+COPY conf/nginx.conf /etc/nginx/nginx.conf
 # Volumes
 VOLUME /var/log/nginx
 # Opening Ports
