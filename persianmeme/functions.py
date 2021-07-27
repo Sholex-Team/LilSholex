@@ -10,32 +10,26 @@ from aiohttp import ClientSession, TCPConnector, ClientError
 from django.core.paginator import Paginator
 import asyncio
 from django import db
-from .keyboards import numbers
 from .types import ObjectType
 
 
-@sync_to_async
 def get_vote(file_unique_id):
-    target_voice = models.Voice.objects.filter(
+    if (target_voice := models.Voice.objects.filter(
         file_unique_id=file_unique_id,
         status=models.Voice.Status.PENDING
-    )
-    if target_voice.exists():
+    )).exists():
         return target_voice.first()
 
 
-@sync_to_async
-def get_voice(file_unique_id, voice_type=models.Voice.Type.NORMAL):
-    target_voice = models.Voice.objects.filter(
+def get_voice(file_unique_id: str, voice_type=models.Voice.Type.NORMAL):
+    if (target_voice := models.Voice.objects.filter(
         file_unique_id=file_unique_id,
         status__in=models.PUBLIC_STATUS,
         voice_type=voice_type
-    )
-    if target_voice.exists():
+    )).exists():
         return target_voice.first()
 
 
-@sync_to_async
 def get_admin_voice(voice_id: int):
     try:
         return models.Voice.objects.get(voice_id=voice_id)
@@ -43,24 +37,17 @@ def get_admin_voice(voice_id: int):
         return None
 
 
-@sync_to_async
-def get_owner():
-    return models.User.objects.get(rank='o')
-
-
-@sync_to_async
 def count_voices():
     voices_count = models.Voice.objects.filter(status__in=models.PUBLIC_STATUS).count()
     return f'All voices count : {voices_count}'
 
 
-@sync_to_async
 def change_user_status(chat_id, status):
     models.User.objects.filter(chat_id=chat_id).update(status=status)
 
 
-@decorators.async_fix
-async def answer_inline_query(
+@decorators.sync_fix
+def answer_inline_query(
         inline_query_id: str,
         results: str,
         next_offset: str,
@@ -68,9 +55,9 @@ async def answer_inline_query(
         is_personal: bool,
         switch_pm_text: str,
         switch_pm_parameter: str,
-        session: ClientSession
+        session: requests.Session
 ):
-    async with session.get(
+    with session.get(
         f'https://api.telegram.org/bot{settings.MEME}/answerInlineQuery',
         params={
             'results': results,
@@ -86,44 +73,29 @@ async def answer_inline_query(
 
 
 @decorators.sync_fix
-def delete_vote_sync(voice: models.Voice):
-    requests.get(
-        f'https://api.telegram.org/bot{settings.MEME}/deleteMessage',
-        params={'chat_id': settings.MEME_CHANNEL, 'message_id': voice.message_id}
-    )
-
-
-@decorators.async_fix
-async def delete_vote_async(message_id: int, session: ClientSession):
-    async with session.get(
+def delete_vote_sync(message_id: int, session: requests.Session = requests.Session()):
+    with session.get(
         f'https://api.telegram.org/bot{settings.MEME}/deleteMessage',
         params={'chat_id': settings.MEME_CHANNEL, 'message_id': message_id}
     ) as _:
         return
 
 
-@sync_to_async
 def check_voice(file_unique_id: str):
     target_voice = models.Voice.objects.filter(file_unique_id=file_unique_id, status=models.Voice.Status.PENDING)
     if target_voice.exists():
         return target_voice.first()
 
 
-def answer_callback_query(session: ClientSession):
+def answer_callback_query(session: requests.Session):
     return answer_callback_query_closure(session, settings.MEME)
 
 
-@sync_to_async
 def get_delete(delete_id: int):
     try:
         return models.Delete.objects.get(delete_id=delete_id)
     except models.Delete.DoesNotExist:
         return None
-
-
-@sync_to_async
-def delete_target_voice(target_delete: models.Delete):
-    target_delete.voice.delete()
 
 
 @decorators.sync_fix
@@ -134,22 +106,6 @@ def send_message(chat_id: int, text: str):
     )
 
 
-@sync_to_async
-def count_users():
-    return models.User.objects.count()
-
-
-@sync_to_async
-def get_delete_requests():
-    return tuple(models.Delete.objects.all())
-
-
-@sync_to_async
-def get_all_accepted():
-    return tuple(models.Voice.objects.filter(status=models.Voice.Status.SEMI_ACTIVE))
-
-
-@sync_to_async
 def accept_voice(file_unique_id: str):
     if (
             voice := models.Voice.objects.filter(file_unique_id=file_unique_id, status=models.Voice.Status.SEMI_ACTIVE)
@@ -200,12 +156,12 @@ async def perform_broadcast(broadcast: Broadcast):
 def make_like_result(voice):
     return {
         'type': 'voice',
-        'id': voice['voice_id'],
-        'voice_file_id': voice['file_id'],
-        'title': voice['name'],
+        'id': voice[0],
+        'voice_file_id': voice[1],
+        'title': voice[2],
         'reply_markup': {'inline_keyboard': [
-            [{'text': '👍', 'callback_data': f'up:{voice["voice_id"]}'},
-             {'text': '👎', 'callback_data': f'down:{voice["voice_id"]}'}]
+            [{'text': '👍', 'callback_data': f'up:{voice[0]}'},
+             {'text': '👎', 'callback_data': f'down:{voice[0]}'}]
         ]}
     }
 
@@ -213,15 +169,37 @@ def make_like_result(voice):
 def make_result(voice):
     return {
         'type': 'voice',
-        'id': voice['voice_id'],
-        'voice_file_id': voice['file_id'],
-        'title': voice['name']
+        'id': voice[0],
+        'voice_file_id': voice[1],
+        'title': voice[2]
     }
 
 
-def make_list_string(object_type: ObjectType, objs: tuple):
-    if objs:
-        return '\n\n'.join([f'{numbers[index]} {obj.name}' for index, obj in enumerate(objs)])
+def make_voice_result(voice: models.Voice):
+    return {
+        'type': 'voice',
+        'id': voice.id,
+        'voice_file_id': voice.file_id,
+        'title': voice.name,
+        'reply_markup': {'inline_keyboard': [
+            [{'text': '👍', 'callback_data': f'up:{voice.id}'},
+             {'text': '👎', 'callback_data': f'down:{voice.id}'}]
+        ]}
+    }
+
+
+def make_voice_like_result(voice: models.Voice):
+    return {
+        'type': 'voice',
+        'id': voice.id,
+        'voice_file_id': voice.file_id,
+        'title': voice.name
+    }
+
+
+def make_list_string(object_type: ObjectType, objs):
+    if objs.exists():
+        return '\n\n'.join([f'🔴 {index + 1} : {obj.name}' for index, obj in enumerate(objs)])
     return user_messages['no_playlist'] if object_type is ObjectType.PLAYLIST else user_messages['no_voice']
 
 
@@ -229,20 +207,14 @@ def paginate(objs, page: int):
     paginator = Paginator(objs, 9)
     if not paginator.num_pages:
         return (), None, None
-    page = paginator.page(page)
+    page = paginator.page(page) if page <= paginator.num_pages else paginator.page(paginator.num_pages)
     return (
-        tuple(page.object_list),
+        page.object_list,
         page.previous_page_number() if page.has_previous() else None,
         page.next_page_number() if page.has_next() else None
     )
 
 
-@sync_to_async
-def get_contact_admin_messages():
-    return tuple(models.Message.objects.select_related('sender').filter(status=models.Message.Status.PENDING))
-
-
-@sync_to_async
 def get_message(message_id: int):
     try:
         target_message = models.Message.objects.select_related('sender').get(
@@ -253,3 +225,10 @@ def get_message(message_id: int):
     target_message.status = models.Message.Status.READ
     target_message.save()
     return target_message
+
+
+def create_voice_list(voices: tuple):
+    voices_str = str()
+    for voice in voices:
+        voices_str += f'⭕ {voice.name}\n'
+    return voices_str

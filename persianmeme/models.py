@@ -3,9 +3,8 @@ from urllib.parse import urlencode
 import requests
 from django.conf import settings
 from django.db import models
-from LilSholex.decorators import async_fix
+from LilSholex.decorators import sync_fix
 from .keyboards import voice as voice_keyboard
-from aiohttp import ClientSession
 from asgiref.sync import sync_to_async
 from uuid import uuid4
 from . import translations
@@ -33,9 +32,11 @@ class User(models.Model):
 
     class VoiceOrder(models.TextChoices):
         votes = 'votes', 'Votes (Low to High)'
-        voice_id = 'voice_id', 'Voice ID (Old to New)'
+        voice_id = 'id', 'Voice ID (Old to New)'
         high_votes = '-votes', 'Votes (High to Low)'
-        new_voice_id = '-voice_id', 'Voice ID (New to Old)'
+        new_voice_id = '-id', 'Voice ID (New to Old)'
+        high_usage = '-usage_count', 'Usage Count (High to Low)'
+        low_usage = 'usage_count', 'Usage Count (Low to High)'
 
     class MenuMode(models.TextChoices):
         ADMIN = 'a', 'Admin'
@@ -71,18 +72,16 @@ class User(models.Model):
         USER_CONTACT_ADMIN = 20, 'User Contact Admin'
         USER_SUGGEST_VOICE_NAME = 21, 'User Suggest Voice Name'
         USER_SUGGEST_VOICE = 22, 'User Suggest Voice'
-        USER_DELETE_SUGGESTION = 23, 'User Delete Suggestion'
         USER_RANKING = 24, 'User Ranking'
         USER_SORTING = 25, 'User Sorting'
         USER_DELETE_REQUEST = 26, 'User Delete Request'
         USER_PRIVATE_VOICES = 27, 'User Private Voices'
         USER_PRIVATE_VOICE_NAME = 28, 'User Private Voice Name'
-        USER_DELETE_PRIVATE_VOICE = 29, 'User Delete Private Voice'
+        USER_MANAGE_PRIVATE_VOICE = 29, 'User Manage Private Voice'
         USER_PRIVATE_VOICE = 30, 'User Private Voice'
         USER_FAVORITE_VOICES = 31, 'User Favorite Voices'
         USER_FAVORITE_VOICE = 32, 'User Favorite Voice'
-        USER_DELETE_FAVORITE_VOICE = 33, 'User Delete Favorite Voice'
-        USER_CANCEL_VOTING = 34, 'User Cancel Voting'
+        USER_MANAGE_FAVORITE_VOICE = 33, 'User Manage Favorite Voice'
         USER_PLAYLISTS = 35, 'User Playlists'
         USER_CREATE_PLAYLIST = 36, 'User Create Playlist'
         USER_MANAGE_PLAYLIST = 37, 'User Manage Playlist'
@@ -91,6 +90,10 @@ class User(models.Model):
         USER_SUGGEST_VOICE_TAGS = 41, 'User Suggest Voice Tags'
         USER_PRIVATE_VOICE_TAGS = 43, 'User Private Voice Tags'
         USER_HELP = 49, 'User Help'
+        USER_SETTINGS = 50, 'User Settings'
+        USER_RECENT_VOICES = 51, 'User Recent Voices'
+        USER_SUGGESTIONS = 52, 'User Suggestions'
+        USER_MANAGE_SUGGESTION = 53, 'User Manage Suggestion'
 
     user_id = models.AutoField(verbose_name='User ID', primary_key=True, unique=True)
     chat_id = models.BigIntegerField(verbose_name='Chat ID', unique=True)
@@ -106,7 +109,7 @@ class User(models.Model):
     last_usage_date = models.DateTimeField(auto_now=True)
     vote = models.BooleanField(verbose_name='Vote System', default=False)
     date = models.DateTimeField(verbose_name='Register Date', auto_now_add=True)
-    voice_order = models.CharField(max_length=9, choices=VoiceOrder.choices, default=VoiceOrder.new_voice_id)
+    voice_order = models.CharField(max_length=12, choices=VoiceOrder.choices, default=VoiceOrder.new_voice_id)
     favorite_voices = models.ManyToManyField('Voice', 'favorite_voices', blank=True)
     back_menu = models.CharField(max_length=50, null=True, blank=True)
     started = models.BooleanField('Started', default=False)
@@ -126,6 +129,10 @@ class User(models.Model):
     menu_mode = models.CharField(
         max_length=1, verbose_name='Menu Mode', choices=MenuMode.choices, default=MenuMode.USER
     )
+    recent_voices = models.ManyToManyField(
+        'Voice', 'recent_voices', blank=True, verbose_name='Recent Voices', through='RecentVoice'
+    )
+    use_recent_voices = models.BooleanField('Use Recent Voices', default=True)
 
     class Meta:
         db_table = 'persianmeme_users'
@@ -145,7 +152,6 @@ class Voice(models.Model):
         NORMAL = 'n', 'Normal'
         PRIVATE = 'p', 'Private'
 
-    @sync_to_async
     def ban_sender(self):
         self.sender.status = self.sender.Status.BANNED
         self.sender.save()
@@ -167,7 +173,6 @@ class Voice(models.Model):
             del kwargs['dont_send']
         super().delete(*args, **kwargs)
 
-    voice_id = models.AutoField(verbose_name='Voice ID', unique=True, primary_key=True)
     message_id = models.BigIntegerField(verbose_name='Message ID', null=True, blank=True)
     file_id = models.CharField(max_length=200, verbose_name='Voice File ID')
     file_unique_id = models.CharField(max_length=100, verbose_name='Voice Unique ID')
@@ -177,29 +182,27 @@ class Voice(models.Model):
     votes = models.IntegerField(default=0, verbose_name='Up Votes')
     status = models.CharField(max_length=1, choices=Status.choices)
     date = models.DateTimeField(auto_now_add=True, verbose_name='Register Date')
-    last_check = models.DateTimeField(auto_now=True)
     voice_type = models.CharField(max_length=1, choices=Type.choices, default=Type.NORMAL)
     accept_vote = models.ManyToManyField(User, 'accept_vote_users', blank=True, verbose_name='Accept Votes')
     deny_vote = models.ManyToManyField(User, 'deny_vote_users', blank=True, verbose_name='Deny Votes')
     tags = models.ManyToManyField(VoiceTag, 'voice_tags', blank=True)
+    usage_count = models.PositiveIntegerField('Usage Count', default=0)
 
     class Meta:
         db_table = 'persianmeme_voices'
-        ordering = ['-voice_id']
+        ordering = ['-id']
 
     def __str__(self):
         return f'{self.name}:{self.file_id}'
 
-    @sync_to_async
-    def async_accept(self):
+    def user_accept(self):
         self.status = self.Status.SEMI_ACTIVE
         self.save()
         self.accept_vote.clear()
         self.deny_vote.clear()
         return self.sender
 
-    @sync_to_async
-    def async_deny(self):
+    def user_deny(self):
         sender = self.sender
         self.delete(dont_send=True)
         return sender
@@ -219,15 +222,6 @@ class Voice(models.Model):
         send_message(self.sender.chat_id, translations.user_messages['voice_denied'])
         self.delete(dont_send=True)
 
-    @sync_to_async
-    def get_voters(self):
-        return tuple(self.voters.all())
-    
-    @property
-    @sync_to_async
-    def get_tags(self):
-        return tuple(self.tags.all())
-
     def edit_vote_count(self):
         while True:
             try:
@@ -241,21 +235,21 @@ class Voice(models.Model):
                 continue
             break
 
-    @async_fix
-    async def send_voice(self, session: ClientSession) -> int:
+    @sync_fix
+    def send_voice(self, session: requests.Session) -> int:
         tags_string = str()
-        for tag in await self.get_tags:
+        for tag in self.tags.all():
             tags_string += f'\n<code>{tag.tag}</code>'
         encoded = urlencode({
             'caption': f'<b>Voice Name</b>: {self.name}\n\n<b>Voice Tags 👇</b>{tags_string}',
             'parse_mode': 'Html',
             'reply_markup': json.dumps(voice_keyboard())
         })
-        async with session.get(
+        with session.get(
                 f'https://api.telegram.org/bot{settings.MEME}/sendVoice?chat_id={settings.MEME_CHANNEL}&'
                 f'voice={self.file_id}&{encoded}'
         ) as response:
-            response = await response.json()
+            response = response.json()
             if response['ok']:
                 return response['result']['message_id']
         return 0
@@ -285,15 +279,7 @@ class Delete(models.Model):
         ordering = ['delete_id']
 
     def __str__(self):
-        return f'{self.delete_id} : {self.voice.voice_id}'
-
-    @sync_to_async
-    def get_voice(self):
-        return self.voice
-
-    @sync_to_async
-    def get_user(self):
-        return self.user
+        return f'{self.delete_id} : {self.voice.id}'
 
 
 class Broadcast(models.Model):
@@ -346,6 +332,15 @@ class Message(models.Model):
 
     def __str__(self):
         return f'{self.id} : {self.sender.chat_id}'
+
+
+class RecentVoice(models.Model):
+    user = models.ForeignKey(User, models.CASCADE, 'recent_voice_user')
+    voice = models.ForeignKey(Voice, models.CASCADE, 'recent_voice_voice')
+
+    class Meta:
+        ordering = ['-id']
+        db_table = 'persianmeme_user_recent_voices'
 
 
 PUBLIC_STATUS = (Voice.Status.ACTIVE, Voice.Status.SEMI_ACTIVE)

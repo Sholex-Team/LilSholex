@@ -3,8 +3,11 @@ from enum import Enum, unique, auto
 
 @unique
 class ObjectType(Enum):
-    VOICE = auto()
+    PLAYLIST_VOICE = auto()
     PLAYLIST = auto()
+    PRIVATE_VOICE = auto()
+    FAVORITE_VOICE = auto()
+    SUGGESTED_VOICE = auto()
 
     @staticmethod
     def check_value(value: str):

@@ -94,57 +94,8 @@ services:
     ports:
     - 443:443/tcp
     - 80:80/tcp
-  daphne:
-    image: docker.pkg.github.com/sholex-team/lilsholex/lilsholex:latest
-    networks:
-      - db_django
-      - nginx_lilsholex
-      - internet
-    secrets:
-      - db_password
-      - persianmeme_channel
-      - persianmeme_help_messages
-      - persianmeme_token
-      - secret_key
-      - persianmeme_logs
-      - persianmeme_messages
-    depends_on:
-      - db
-      - migrations
-    healthcheck:
-      test: python healthchecks/daphne.py
-      interval: 30s
-      timeout: 10s
-      start_period: 1m
-      retries: 3
-    deploy:
-      replicas: 2
-      placement:
-        constraints:
-          - node.labels.webserver==true
-      restart_policy:
-        condition: any
-        max_attempts: 3
-        window: 10s
-        delay: 5s
-      update_config:
-        parallelism: 1
-        delay: 5s
-        failure_action: rollback
-        monitor: 10s
-        order: start-first
-      rollback_config:
-        parallelism: 1
-        delay: 5s
-        failure_action: pause
-        monitor: 10s
-        order: stop-first
-    volumes:
-      - type: volume
-        source: persianmeme
-        target: /home/sholex/persianmeme/migrations
   gunicorn:
-    image: docker.pkg.github.com/sholex-team/lilsholex/lilsholex:latest
+    image: ghcr.io/sholex-team/lilsholex/lilsholex:4.6
     command: "gunicorn --workers=1 --threads=2 --bind=0.0.0.0:8080 \
     --access-logfile /dev/null --error-logfile /dev/stderr LilSholex.wsgi"
     networks:
@@ -169,7 +120,7 @@ services:
       start_period: 1m
       retries: 3
     deploy:
-      replicas: 1
+      replicas: 2
       placement:
         constraints:
           - node.labels.webserver==true
@@ -195,7 +146,7 @@ services:
         source: persianmeme
         target: /home/sholex/persianmeme/migrations
   tasks:
-    image: docker.pkg.github.com/sholex-team/lilsholex/lilsholex:latest
+    image: ghcr.io/sholex-team/lilsholex/lilsholex:4.6
     command: bash -c "python manage.py clear_tasks && python manage.py process_tasks --sleep 15"
     networks:
       - db_django
@@ -238,7 +189,7 @@ services:
         source: persianmeme
         target: /home/sholex/persianmeme/migrations
   broadcasts:
-    image: docker.pkg.github.com/sholex-team/lilsholex/lilsholex:latest
+    image: ghcr.io/sholex-team/lilsholex/lilsholex:4.6
     command: "python manage.py process_broadcasts"
     networks:
       - db_django
@@ -281,7 +232,7 @@ services:
         source: persianmeme
         target: /home/sholex/persianmeme/migrations
   migrations:
-    image: docker.pkg.github.com/sholex-team/lilsholex/lilsholex:latest
+    image: ghcr.io/sholex-team/lilsholex/lilsholex:4.6
     command: "bash -c 'yes | python manage.py makemigrations persianmeme && yes | python manage.py migrate &&\
     python manage.py collectstatic --noinput'"
     secrets:

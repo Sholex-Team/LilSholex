@@ -130,7 +130,7 @@ class Voice(admin.ModelAdmin):
     @admin.display(description='Accept Votes')
     def accept_vote(self, request, queryset):
         result = [
-            (target_voice, target_voice.accept(), delete_vote_sync(target_voice))
+            (target_voice, target_voice.accept(), delete_vote_sync(target_voice.message_id))
             for target_voice in queryset if target_voice.status == 'p'
         ]
         result_len = len(result)
@@ -144,7 +144,7 @@ class Voice(admin.ModelAdmin):
     @admin.display(description='Deny Vote')
     def deny_vote(self, request, queryset):
         result = [
-            (target_voice, target_voice.deny(), delete_vote_sync(target_voice))
+            (target_voice, target_voice.deny(), delete_vote_sync(target_voice.message_id))
             for target_voice in queryset if target_voice.status == 'p'
         ]
         result_len = len(result)
@@ -183,17 +183,19 @@ class Voice(admin.ModelAdmin):
 
     add_fake_deny_votes.allowed_permissions = change_permission
     date_hierarchy = 'date'
-    list_display = ('voice_id', 'name', 'sender', 'votes', 'status', count_deny_votes, count_accept_votes, count_tags)
+    list_display = (
+        'id', 'name', 'sender', 'votes', 'status', 'usage_count',count_deny_votes, count_accept_votes, count_tags
+    )
     list_filter = ('status', 'voice_type')
-    search_fields = ('name', 'sender__chat_id', 'file_id', 'file_unique_id', 'voice_id', 'sender__user_id')
+    search_fields = ('name', 'sender__chat_id', 'file_id', 'file_unique_id', 'id', 'sender__user_id')
     actions = (export_json, accept_vote, deny_vote, add_fake_deny_votes)
     list_per_page = 15
-    readonly_fields = ('voice_id', 'date', 'last_check')
+    readonly_fields = ('id', 'date')
     raw_id_fields = ('sender', 'voters', 'accept_vote', 'deny_vote', 'tags')
     fieldsets = (
-        ('Information', {'fields': ('voice_id', 'file_id', 'name', 'file_unique_id', 'date', 'sender', 'tags')}),
+        ('Information', {'fields': ('id', 'file_id', 'name', 'file_unique_id', 'date', 'sender', 'tags')}),
         ('Status', {'fields': (
-            'status', 'votes', 'voice_type', 'last_check', 'voters', 'accept_vote', 'deny_vote'
+            'status', 'votes', 'voice_type', 'voters', 'accept_vote', 'deny_vote', 'usage_count'
         )})
     )
 
@@ -212,7 +214,7 @@ class Delete(admin.ModelAdmin):
     list_display = ('delete_id', 'voice', 'user')
     readonly_fields = ('delete_id',)
     search_fields = (
-        'delete_id', 'user__username', 'user__chat_id', 'voice__voice_id', 'voice__file_id', 'voice__file_unique_id'
+        'delete_id', 'user__username', 'user__chat_id', 'voice__id', 'voice__file_id', 'voice__file_unique_id'
     )
     raw_id_fields = ('voice', 'user')
     fieldsets = (('Information', {'fields': ('delete_id', 'voice', 'user')}),)
@@ -258,3 +260,21 @@ class VoiceTag(admin.ModelAdmin):
     search_fields = ('tag',)
     list_per_page = 30
     fieldsets = (('Information', {'fields': ('tag',)}),)
+
+
+@admin.register(models.RecentVoice)
+class RecentVoice(admin.ModelAdmin):
+    raw_id_fields = ('user', 'voice')
+    readonly_fields = ('id',)
+    list_display = ('id', 'user', 'voice')
+    list_per_page = 30
+    search_fields = (
+        'id',
+        'user__username',
+        'user__chat_id',
+        'user__user_id',
+        'voice__id',
+        'voice__file_unique_id',
+        'voice__file_id'
+    )
+    fieldsets = (('Information', {'fields': ('id', 'user', 'voice')}),)

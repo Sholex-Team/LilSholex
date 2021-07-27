@@ -39,16 +39,16 @@ admin_steps = {
 }
 user_steps = {
     'main': {'menu': User.Menu.USER_MAIN, 'message': translations.user_messages['back'], 'keyboard': keyboards.user},
-    'private': {
+    'manage_private_voices': {
         'menu': User.Menu.USER_PRIVATE_VOICES,
         'message': translations.user_messages['choices'],
-        'keyboard': keyboards.private,
+        'keyboard': keyboards.manage_voice_list,
         'before': 'main'
     },
-    'favorite': {
+    'manage_favorite_voices': {
         'menu': User.Menu.USER_FAVORITE_VOICES,
         'message': translations.user_messages['choices'],
-        'keyboard': keyboards.private,
+        'keyboard': keyboards.manage_voice_list,
         'before': 'main'
     },
     'suggest_name': {
@@ -86,5 +86,17 @@ user_steps = {
         'keyboard': keyboards.manage_playlist,
         'before': 'manage_playlists',
         'callback': 'clear_current_voice'
+    },
+    'settings': {
+        'menu': User.Menu.USER_SETTINGS,
+        'message': translations.user_messages['settings'],
+        'keyboard': keyboards.settings,
+        'before': 'main'
+    },
+    'manage_suggestions': {
+        'menu': User.Menu.USER_SUGGESTIONS,
+        'message': translations.user_messages['choices'],
+        'keyboard': keyboards.manage_suggestions,
+        'before': 'main'
     }
 }

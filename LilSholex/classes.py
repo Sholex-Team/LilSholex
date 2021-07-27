@@ -1,10 +1,9 @@
-from LilSholex.decorators import async_fix
+from LilSholex.decorators import sync_fix
 import json
 from persianmeme.models import User as PersianMemeUser
-from typing import Union, Tuple
-from aiohttp import ClientSession
+from typing import Union
 from abc import ABC, abstractmethod
-from asgiref.sync import sync_to_async
+from requests import Session
 
 
 class Base(ABC):
@@ -16,28 +15,25 @@ class Base(ABC):
             token: str,
             chat_id: Union[int, None],
             instance: Union[PersianMemeUser, None],
-            session: ClientSession
+            session: Session
     ):
         self.token = token
         self.chat_id = chat_id
         self._session = session
         self._instance = instance
-
-    def __await__(self):
         if not self.chat_id:
             assert self._instance, 'Instance must be passed when chat id isn\'t !'
             self.database = self._instance
         else:
-            self.database = yield from self.get_user().__await__()
+            self.database = self.get_user()
         self._BASE_PARAM = {'chat_id': self.database.chat_id}
-        return self
 
     @abstractmethod
-    def get_user(self) -> Tuple[PersianMemeUser, bool]:
+    def get_user(self) -> PersianMemeUser:
         pass
 
-    @async_fix
-    async def send_message(
+    @sync_fix
+    def send_message(
             self,
             text: str,
             reply_markup: dict = str(),
@@ -47,7 +43,7 @@ class Base(ABC):
     ) -> int:
         if reply_markup:
             reply_markup = json.dumps(reply_markup)
-        async with self._session.get(
+        with self._session.get(
             f'{self._BASE_URL}sendMessage',
             params={
                 **self._BASE_PARAM,
@@ -58,31 +54,31 @@ class Base(ABC):
                 'disable_web_page_preview': str(disable_web_page_preview)
             }
         ) as response:
-            response = await response.json()
+            response = response.json()
             if response['ok']:
                 return response['result']['message_id']
             return 0
 
-    @async_fix
-    async def delete_message(self, message_id: int) -> None:
-        async with self._session.get(
+    @sync_fix
+    def delete_message(self, message_id: int) -> None:
+        with self._session.get(
             f'{self._BASE_URL}deleteMessage',
             params={**self._BASE_PARAM, 'message_id': message_id}
         ) as _:
             return
 
-    @async_fix
-    async def edit_message_text(self, message_id: int, text: str, inline_keyboard: dict = str()):
+    @sync_fix
+    def edit_message_text(self, message_id: int, text: str, inline_keyboard: dict = str()):
         if inline_keyboard:
             inline_keyboard = json.dumps(inline_keyboard)
-        async with self._session.get(
+        with self._session.get(
             f'{self._BASE_URL}editMessageText',
             params={**self._BASE_PARAM, 'message_id': message_id, 'text': text, 'reply_markup': inline_keyboard}
         ) as _:
             return
 
-    @async_fix
-    async def send_animation(
+    @sync_fix
+    def send_animation(
             self,
             animation: str,
             caption: str = str(),
@@ -92,7 +88,7 @@ class Base(ABC):
     ):
         if reply_markup:
             reply_markup = json.dumps(reply_markup)
-        async with self._session.get(f'{self._BASE_URL}sendAnimation', params={
+        with self._session.get(f'{self._BASE_URL}sendAnimation', params={
             **self._BASE_PARAM,
             'animation': animation,
             'caption': caption,
@@ -102,12 +98,8 @@ class Base(ABC):
         }):
             return
 
-    @sync_to_async
-    def save(self):
-        self.database.save()
-
     @abstractmethod
-    async def go_back(self):
+    def go_back(self):
         pass
 
     @abstractmethod
