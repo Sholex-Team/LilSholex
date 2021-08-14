@@ -184,18 +184,20 @@ class Voice(admin.ModelAdmin):
     add_fake_deny_votes.allowed_permissions = change_permission
     date_hierarchy = 'date'
     list_display = (
-        'id', 'name', 'sender', 'votes', 'status', 'usage_count',count_deny_votes, count_accept_votes, count_tags
+        'id', 'name', 'sender', 'votes', 'status', 'usage_count', count_deny_votes, count_accept_votes, count_tags
     )
-    list_filter = ('status', 'voice_type')
+    list_filter = ('status', 'voice_type', 'reviewed')
     search_fields = ('name', 'sender__chat_id', 'file_id', 'file_unique_id', 'id', 'sender__user_id')
     actions = (export_json, accept_vote, deny_vote, add_fake_deny_votes)
     list_per_page = 15
     readonly_fields = ('id', 'date')
-    raw_id_fields = ('sender', 'voters', 'accept_vote', 'deny_vote', 'tags')
+    raw_id_fields = ('sender', 'voters', 'accept_vote', 'deny_vote', 'tags', 'assigned_admin')
     fieldsets = (
-        ('Information', {'fields': ('id', 'file_id', 'name', 'file_unique_id', 'date', 'sender', 'tags')}),
+        ('Information', {'fields': (
+            'id', 'file_id', 'name', 'file_unique_id', 'date', 'sender', 'tags', 'assigned_admin'
+        )}),
         ('Status', {'fields': (
-            'status', 'votes', 'voice_type', 'voters', 'accept_vote', 'deny_vote', 'usage_count'
+            'status', 'votes', 'voice_type', 'voters', 'accept_vote', 'deny_vote', 'usage_count', 'reviewed'
         )})
     )
 

@@ -24,7 +24,7 @@ def get_vote(file_unique_id):
 def get_voice(file_unique_id: str, voice_type=models.Voice.Type.NORMAL):
     if (target_voice := models.Voice.objects.filter(
         file_unique_id=file_unique_id,
-        status__in=models.PUBLIC_STATUS,
+        status=models.Voice.Status.ACTIVE,
         voice_type=voice_type
     )).exists():
         return target_voice.first()
@@ -38,7 +38,7 @@ def get_admin_voice(voice_id: int):
 
 
 def count_voices():
-    voices_count = models.Voice.objects.filter(status__in=models.PUBLIC_STATUS).count()
+    voices_count = models.Voice.objects.filter(status=models.Voice.Status.ACTIVE).count()
     return f'All voices count : {voices_count}'
 
 

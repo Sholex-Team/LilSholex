@@ -24,7 +24,8 @@ from .keyboards import (
     en_back,
     owner,
     user as user_keyboard,
-    manage_suggestions
+    manage_suggestions,
+    voice_review
 )
 from .types import InvalidVoiceTag, LongVoiceTag, TooManyVoiceTags
 from string import punctuation
@@ -32,6 +33,7 @@ from itertools import combinations
 from django.db.models import Q, Case, When, BooleanField
 from .types import ObjectType
 from requests import Session
+from .tasks import revoke_review
 
 
 class User(Base):
@@ -61,17 +63,16 @@ class User(Base):
             self.__ads = models.Ad.objects.exclude(seen=user)
         return user
 
-    def delete_semi_active(self, file_unique_id: str):
-        if (result := models.Voice.objects.filter(
-                file_unique_id=file_unique_id, status=models.Voice.Status.SEMI_ACTIVE
-        )).exists():
-            result.first().delete(admin=self.database)
-            return True
-        return False
+    def delete_current_voice(self):
+        if self.database.current_voice:
+            self.database.current_voice.delete(admin=self.database)
+            self.send_message(translations.admin_messages['deleted'])
+        else:
+            self.send_message(translations.admin_messages['deleted_before'])
 
     def delete_voice(self, file_unique_id):
         if (result := models.Voice.objects.filter(
-                file_unique_id=file_unique_id, voice_type=models.Voice.Type.NORMAL, status__in=models.PUBLIC_STATUS
+                file_unique_id=file_unique_id, voice_type=models.Voice.Type.NORMAL, status=models.Voice.Status.ACTIVE
         )).exists():
             result.first().delete(admin=self.database)
 
@@ -164,7 +165,7 @@ class User(Base):
                     Q(id=target_voice_id) & ((
                             Q(voice_type=models.Voice.Type.PRIVATE) &
                             Q(sender=self.database)
-                    ) | Q(voice_type=models.Voice.Type.NORMAL)) & Q(status__in=models.PUBLIC_STATUS)
+                    ) | Q(voice_type=models.Voice.Type.NORMAL)) & Q(status=models.Voice.Status.ACTIVE)
                 ))], str())
             except models.Voice.DoesNotExist:
                 return list(), str()
@@ -196,10 +197,10 @@ class User(Base):
                 queries & Q(sender=self.database) & Q(voice_type=models.Voice.Type.PRIVATE)
             ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct(),
             lambda: self.database.favorite_voices.values_list('id', 'file_id', 'name').filter(
-                queries & Q(status__in=models.PUBLIC_STATUS)
+                queries & Q(status=models.Voice.Status.ACTIVE)
             ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct(),
             lambda: models.Voice.objects.values_list('id', 'file_id', 'name').filter(
-                queries & Q(status__in=models.PUBLIC_STATUS) & Q(voice_type=models.Voice.Type.NORMAL)
+                queries & Q(status=models.Voice.Status.ACTIVE) & Q(voice_type=models.Voice.Type.NORMAL)
             ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct()
         )
         if len(splinted_offset := offset.split(':')) != len(result_sets):
@@ -274,7 +275,7 @@ class User(Base):
 
     def get_suggested_voice(self, voice_id: str):
         return models.Voice.objects.get(
-            id=voice_id, status__in=models.PUBLIC_STATUS, voice_type=models.Voice.Type.NORMAL, sender=self.database
+            id=voice_id, status=models.Voice.Status.ACTIVE, voice_type=models.Voice.Type.NORMAL, sender=self.database
         )
 
     def delete_private_voice(self):
@@ -553,7 +554,7 @@ class User(Base):
 
     def send_ordered_voice_list(self, ordering: models.User.VoiceOrder):
         ordered_voices = models.Voice.objects.filter(
-            status__in=models.PUBLIC_STATUS, voice_type='n'
+            status=models.Voice.Status.ACTIVE, voice_type='n'
         ).order_by(ordering)[:12]
         return self.send_message(
             make_list_string(ObjectType.PLAYLIST_VOICE, ordered_voices), make_voice_list(ordered_voices)
@@ -592,4 +593,29 @@ class User(Base):
             self.send_message(self.translate('voice_not_accessible'))
             self.go_back()
             return False
+        return True
+
+    def assign_voice(self):
+        if (assigned_voice := models.Voice.objects.filter(
+                assigned_admin=self.database, reviewed=False, voice_type=models.Voice.Type.NORMAL
+        )).exists():
+            self.database.current_voice = assigned_voice.first()
+        elif (new_voice := models.Voice.objects.filter(
+                assigned_admin=None,
+                reviewed=False,
+                status=models.Voice.Status.ACTIVE,
+                voice_type=models.Voice.Type.NORMAL
+        )).exists():
+            self.database.current_voice = new_voice.first()
+            self.database.current_voice.assigned_admin = self.database
+            self.database.current_voice.save()
+            revoke_review(self.database.current_voice.id)
+        else:
+            self.send_message(translations.admin_messages['no_voice_to_review'])
+            return False
+        self.send_message(
+            translations.admin_messages['review_the_voice'],
+            voice_review,
+            self.database.current_voice.send_voice(self.database.chat_id, False, self._session)
+        )
         return True

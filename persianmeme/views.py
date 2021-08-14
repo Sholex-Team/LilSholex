@@ -161,7 +161,7 @@ def webhook(request):
         elif callback_data[0] in ('up', 'down'):
             try:
                 voice = models.Voice.objects.get(id=callback_data[1])
-            except models.Voice.DoesNotExist:
+            except (models.Voice.DoesNotExist, ValueError):
                 inliner.database.save()
                 return HttpResponse(status=200)
             if callback_data[0] == 'up':
@@ -208,18 +208,6 @@ def webhook(request):
                     inliner.database.temp_user_id = user.database.chat_id
                     inliner.send_message(translations.admin_messages['reply'], keyboards.en_back)
                     answer_query(query_id, translations.admin_messages['replying'], False)
-            elif callback_data[0] in ('admin_accept', 'admin_deny'):
-                if callback_data[0] == 'admin_deny':
-                    if inliner.delete_semi_active(message['voice']['file_unique_id']):
-                        answer_query(query_id, translations.admin_messages['deleted'], False)
-                    else:
-                        answer_query(query_id, translations.admin_messages['processed_before'], False)
-                elif callback_data[0] == 'admin_accept':
-                    if functions.accept_voice(message['voice']['file_unique_id']):
-                        answer_query(query_id, translations.admin_messages['accepted'], False)
-                    else:
-                        answer_query(query_id, translations.admin_messages['processed_before'], False)
-                inliner.delete_message(message_id)
             elif callback_data[0] in ('delete', 'delete_deny'):
                 if not (target_delete := functions.get_delete(callback_data[1])):
                     return HttpResponse(status=200)
@@ -307,13 +295,13 @@ def webhook(request):
                     'Unban a User',
                     'Full Ban',
                     'Delete Sound',
-                    'Accepted',
                     'Ban Vote',
                     'Accept Voice',
                     'Deny Voice',
                     'Get Voice',
                     'Edit Voice',
-                    'File ID'
+                    'File ID',
+                    'Voice Review'
                 )):
                     if text == admin_options[0]:
                         user.database.menu = user.database.Menu.ADMIN_GET_USER
@@ -331,43 +319,30 @@ def webhook(request):
                         user.database.menu = user.database.Menu.ADMIN_DELETE_VOICE
                         user.send_message(user.translate('voice'), keyboards.en_back)
                     elif text == admin_options[5]:
-                        if (accepted_voices := models.Voice.objects.filter(
-                                status=models.Voice.Status.SEMI_ACTIVE
-                        )).exists():
-                            for voice in accepted_voices:
-                                user.send_voice(voice.file_id, voice.name, {'inline_keyboard': [[
-                                    {'text': 'Accept', 'callback_data': 'admin_accept'},
-                                    {'text': 'Deny', 'callback_data': 'admin_deny'}
-                                ]]})
-                            user.send_message(
-                                user.translate('accepted_voices'), reply_to_message_id=message_id
-                            )
-                        else:
-                            user.send_message(
-                                user.translate('no_accepted'), reply_to_message_id=message_id
-                            )
-                    elif text == admin_options[6]:
                         user.database.menu = user.database.Menu.ADMIN_BAN_VOTE
                         user.send_message(user.translate('voice'), keyboards.en_back)
-                    elif text == admin_options[7]:
+                    elif text == admin_options[6]:
                         user.database.menu = user.database.Menu.ADMIN_ACCEPT_VOICE
                         user.send_message(user.translate('voice'), keyboards.en_back)
-                    elif text == admin_options[8]:
+                    elif text == admin_options[7]:
                         user.database.menu = user.database.Menu.ADMIN_DENY_VOICE
                         user.send_message(user.translate('voice'), keyboards.en_back)
-                    elif text == admin_options[9]:
+                    elif text == admin_options[8]:
                         user.database.menu = user.database.Menu.ADMIN_GET_VOICE
                         user.send_message(
                             user.translate('send_voice_id'), keyboards.en_back
                         )
-                    elif text == admin_options[10]:
+                    elif text == admin_options[9]:
                         user.database.menu = user.database.Menu.ADMIN_SEND_EDIT_VOICE
                         user.send_message(
                             user.translate('send_edit_voice'), keyboards.en_back
                         )
-                    else:
+                    elif text == admin_options[10]:
                         user.database.menu = user.database.Menu.ADMIN_FILE_ID
                         user.send_message(user.translate('send_file_id'), keyboards.en_back)
+                    else:
+                        if user.assign_voice():
+                            user.database.menu = user.database.Menu.ADMIN_VOICE_REVIEW
                 # Owner Section
                 elif user.database.rank == user.database.Rank.OWNER and text in (owner_options := (
                     'Message User',
@@ -580,16 +555,19 @@ def webhook(request):
                         user.database.current_voice = target_voice
                         user.database.back_menu = 'send_edit_voice'
                         user.database.menu = user.database.Menu.ADMIN_EDIT_VOICE
-                        user.send_message(user.translate('edit_voice'), keyboards.edit_voice)
+                        user.send_message(translations.admin_messages['edit_voice'], keyboards.edit_voice)
             elif user.database.menu == user.database.Menu.ADMIN_EDIT_VOICE:
                 if text in (edit_options := ('Edit Name', 'Edit Tags')):
                     user.database.back_menu = 'edit_voice'
                     if text == edit_options[0]:
                         user.database.menu = user.database.Menu.ADMIN_EDIT_VOICE_NAME
-                        user.send_message(user.translate('edit_voice_name'), keyboards.en_back)
+                        user.send_message(translations.admin_messages['edit_voice_name'], keyboards.en_back)
                     else:
                         user.database.menu = user.database.Menu.ADMIN_EDIT_VOICE_TAGS
-                        user.send_message(user.translate('edit_voice_tags'), keyboards.en_back)
+                        user.send_message(translations.admin_messages['edit_voice_tags'], keyboards.en_back)
+                elif text == 'Done ✔':
+                    user.database.menu = user.database.Menu.ADMIN_MAIN
+                    user.send_message(translations.admin_messages['voice_edited'], keyboards.owner, message_id)
                 else:
                     user.send_message(user.translate('unknown_command'), reply_to_message_id=message_id)
             elif user.database.menu == user.database.Menu.ADMIN_EDIT_VOICE_NAME:
@@ -612,6 +590,31 @@ def webhook(request):
                     )
                 else:
                     user.send_message(user.translate('no_document'), reply_to_message_id=message_id)
+            elif user.database.menu == user.database.Menu.ADMIN_VOICE_REVIEW:
+                if user.check_current_voice():
+                    if text in (review_options := ('Edit Name', 'Edit Tags')):
+                        user.database.back_menu = 'voice_review'
+                        if text == review_options[0]:
+                            user.database.menu = user.database.Menu.ADMIN_EDIT_VOICE_NAME
+                            user.send_message(translations.admin_messages['edit_voice_name'], keyboards.en_back)
+                        else:
+                            user.database.menu = user.database.Menu.ADMIN_EDIT_VOICE_TAGS
+                            user.send_message(translations.admin_messages['edit_voice_tags'], keyboards.en_back)
+                    elif text == 'Delete 🗑':
+                        user.delete_current_voice()
+                        if not user.assign_voice():
+                            user.go_back()
+                    elif text == 'Check the Voice':
+                        user.database.current_voice.send_voice(user.database.chat_id, False, request.http_session)
+                    elif text in (done_options := ('Done ✔', 'Done and Next ⏭')):
+                        user.database.current_voice.reviewed = True
+                        user.database.current_voice.save()
+                        user.send_message(translations.admin_messages['reviewed'])
+                        if text == done_options[0]:
+                            user.go_back()
+                        else:
+                            if not user.assign_voice():
+                                user.go_back()
         elif user.database.status == user.database.Status.ACTIVE and \
                 (user.database.rank == user.database.Rank.USER or
                  user.database.menu_mode == user.database.MenuMode.USER):
@@ -743,7 +746,9 @@ def webhook(request):
                         models.Voice.Status.PENDING
                     ):
                         user.database.menu = user.database.Menu.USER_MAIN
-                        target_voice.message_id = target_voice.send_voice(request.http_session)
+                        target_voice.message_id = target_voice.send_voice(
+                            settings.MEME_CHANNEL, True, request.http_session
+                        )
                         tasks.check_voice(target_voice.id)
                         tasks.update_votes(target_voice.id)
                         user.send_message(

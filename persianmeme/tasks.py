@@ -7,6 +7,16 @@ from background_task.models import CompletedTask
 
 
 @background(schedule=21600)
+def revoke_review(voice_id: int):
+    try:
+        target_voice = Voice.objects.get(id=voice_id, reviewed=False)
+    except Voice.DoesNotExist:
+        return
+    target_voice.assigned_admin = None
+    target_voice.save()
+
+
+@background(schedule=21600)
 def check_voice(voice_id: int):
     CompletedTask.objects.all().delete()
     if datetime.now(ZoneInfo('Asia/Tehran')).hour < 8:

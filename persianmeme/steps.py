@@ -35,6 +35,13 @@ admin_steps = {
         'keyboard': keyboards.edit_voice,
         'before': 'send_edit_voice',
         'callback': 'clear_temp_voice_tags'
+    },
+    'voice_review': {
+        'menu': User.Menu.ADMIN_VOICE_REVIEW,
+        'message': translations.admin_messages['review_the_voice'],
+        'keyboard': keyboards.voice_review,
+        'before': 'main',
+        'callback': 'clear_current_voice'
     }
 }
 user_steps = {

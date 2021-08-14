@@ -1,5 +1,4 @@
 import json
-from urllib.parse import urlencode
 import requests
 from django.conf import settings
 from django.db import models
@@ -68,6 +67,7 @@ class User(models.Model):
         ADMIN_EDIT_VOICE_NAME = 46, 'Admin Edit Voice Name',
         ADMIN_EDIT_VOICE_TAGS = 47, 'Admin Edit Voice Tags',
         ADMIN_FILE_ID = 48, 'Admin File ID'
+        ADMIN_VOICE_REVIEW = 54, 'Admin Voice Review'
         USER_MAIN = 19, 'User Main'
         USER_CONTACT_ADMIN = 20, 'User Contact Admin'
         USER_SUGGEST_VOICE_NAME = 21, 'User Suggest Voice Name'
@@ -146,7 +146,6 @@ class Voice(models.Model):
     class Status(models.TextChoices):
         ACTIVE = 'a', 'Active'
         PENDING = 'p', 'Pending'
-        SEMI_ACTIVE = 's', 'Semi Active'
 
     class Type(models.TextChoices):
         NORMAL = 'n', 'Normal'
@@ -177,7 +176,7 @@ class Voice(models.Model):
     file_id = models.CharField(max_length=200, verbose_name='Voice File ID')
     file_unique_id = models.CharField(max_length=100, verbose_name='Voice Unique ID')
     name = models.CharField(max_length=200)
-    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='senders')
+    sender = models.ForeignKey(User, models.CASCADE, related_name='senders')
     voters = models.ManyToManyField(User, related_name='voters', blank=True)
     votes = models.IntegerField(default=0, verbose_name='Up Votes')
     status = models.CharField(max_length=1, choices=Status.choices)
@@ -187,6 +186,10 @@ class Voice(models.Model):
     deny_vote = models.ManyToManyField(User, 'deny_vote_users', blank=True, verbose_name='Deny Votes')
     tags = models.ManyToManyField(VoiceTag, 'voice_tags', blank=True)
     usage_count = models.PositiveIntegerField('Usage Count', default=0)
+    assigned_admin = models.ForeignKey(
+        User, models.SET_NULL, 'voice_admin', verbose_name='Assigned Admin', null=True, blank=True
+    )
+    reviewed = models.BooleanField('Is Reviewed', default=False)
 
     class Meta:
         db_table = 'persianmeme_voices'
@@ -196,7 +199,7 @@ class Voice(models.Model):
         return f'{self.name}:{self.file_id}'
 
     def user_accept(self):
-        self.status = self.Status.SEMI_ACTIVE
+        self.status = self.Status.ACTIVE
         self.save()
         self.accept_vote.clear()
         self.deny_vote.clear()
@@ -209,13 +212,13 @@ class Voice(models.Model):
 
     def accept(self):
         from .functions import send_message
-        self.status = self.Status.SEMI_ACTIVE
+        self.status = self.Status.ACTIVE
         self.save()
         self.accept_vote.clear()
         self.deny_vote.clear()
         send_message(self.sender.chat_id, translations.user_messages['voice_accepted'])
         for admin in User.objects.filter(rank=User.Rank.ADMIN):
-            send_message(admin.chat_id, translations.admin_messages['new_voice_accepted'])
+            send_message(admin.chat_id, translations.admin_messages['review_required'])
 
     def deny(self):
         from .functions import send_message
@@ -236,19 +239,19 @@ class Voice(models.Model):
             break
 
     @sync_fix
-    def send_voice(self, session: requests.Session) -> int:
+    def send_voice(self, chat_id: int, send_voice_keyboard, session: requests.Session) -> int:
         tags_string = str()
         for tag in self.tags.all():
             tags_string += f'\n<code>{tag.tag}</code>'
-        encoded = urlencode({
+        voice_dict = {
             'caption': f'<b>Voice Name</b>: {self.name}\n\n<b>Voice Tags 👇</b>{tags_string}',
             'parse_mode': 'Html',
-            'reply_markup': json.dumps(voice_keyboard())
-        })
-        with session.get(
-                f'https://api.telegram.org/bot{settings.MEME}/sendVoice?chat_id={settings.MEME_CHANNEL}&'
-                f'voice={self.file_id}&{encoded}'
-        ) as response:
+            'voice': self.file_id,
+            'chat_id': chat_id
+        }
+        if send_voice_keyboard:
+            voice_dict['reply_markup'] = json.dumps(voice_keyboard())
+        with session.get(f'https://api.telegram.org/bot{settings.MEME}/sendVoice', params=voice_dict) as response:
             response = response.json()
             if response['ok']:
                 return response['result']['message_id']
@@ -343,5 +346,4 @@ class RecentVoice(models.Model):
         db_table = 'persianmeme_user_recent_voices'
 
 
-PUBLIC_STATUS = (Voice.Status.ACTIVE, Voice.Status.SEMI_ACTIVE)
 BOT_ADMINS = (User.Rank.ADMIN, User.Rank.OWNER)

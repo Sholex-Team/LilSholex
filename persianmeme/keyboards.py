@@ -7,8 +7,8 @@ owner = {'keyboard': [
     ['Get Voice', 'Get User'],
     ['Add Ad', 'Delete Ad', 'Edit Ad'],
     ['Accept Voice', 'Ban Vote', 'Deny Voice'],
-    ['Edit Voice', 'File ID'],
-    ['Messages', 'Accepted', 'Delete Requests']
+    ['Edit Voice', 'File ID', 'Voice Review'],
+    ['Messages', 'Delete Requests']
 ], 'resize_keyboard': True}
 user = {'keyboard': [
     ['راهنما 🔰'],
@@ -50,7 +50,10 @@ manage_playlist = {'keyboard': [
     ['بازگشت 🔙']
 ], 'resize_keyboard': True}
 manage_voice = {'keyboard': [['حذف ویس ❌', 'گوش دادن به ویس 🎧'], ['بازگشت 🔙']], 'resize_keyboard': True}
-edit_voice = {'keyboard': [['Edit Name', 'Edit Tags'], ['Back 🔙']], 'resize_keyboard': True}
+edit_voice = {'keyboard': [['Edit Name', 'Edit Tags'], ['Done ✔'], ['Back 🔙']], 'resize_keyboard': True}
+voice_review = {'keyboard': [
+    ['Edit Name', 'Edit Tags'], ['Delete 🗑', 'Check the Voice'], ['Done ✔', 'Done and Next ⏭'], ['Back 🔙']
+], 'resize_keyboard': True}
 
 
 def voice(accept_count: int = 0, deny_count: int = 0):

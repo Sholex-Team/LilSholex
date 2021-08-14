@@ -1,7 +1,7 @@
 version: "3.8"
 services:
   db:
-    image: mysql:8.0.25
+    image: mysql:8.0.26
     command: --default-authentication-plugin=mysql_native_password
     environment:
         MYSQL_ROOT_PASSWORD_FILE: "/run/secrets/db_password"
@@ -92,12 +92,10 @@ services:
       - ssl_key
       - dhparam
     ports:
-    - 443:443/tcp
-    - 80:80/tcp
+    - "443:443/tcp"
+    - "80:80/tcp"
   gunicorn:
-    image: ghcr.io/sholex-team/lilsholex/lilsholex:4.6
-    command: "gunicorn --workers=1 --threads=2 --bind=0.0.0.0:8080 \
-    --access-logfile /dev/null --error-logfile /dev/stderr LilSholex.wsgi"
+    image: ghcr.io/sholex-team/lilsholex/lilsholex:4.9
     networks:
       - db_django
       - nginx_lilsholex
