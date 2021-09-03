@@ -18,7 +18,7 @@ admin_messages = {
     'delete_requests': 'Here are delete requests 👆',
     'messages': 'Here are messages 👆',
     'no_message': 'There is no new message !',
-    'no_delete_requests': 'There is     no more delete requests !',
+    'no_delete_requests': 'There is no more delete requests !',
     'broadcast': 'Please sent the message you want to broadcast.',
     'voice_info': 'Voice Name : {0}\n\nYou can use it by typing\n\n '
                   '@Persian_Meme_Bot {0}\n\nin a chat 😁',
@@ -39,7 +39,7 @@ admin_messages = {
     'ad_edited': 'Ad has been edited ✔️',
     'voice_edited': 'Voice editing is done ✔',
     'send_a_voice': 'Please send a voice ⚠️',
-    'deleted_by_admins': 'Voice has been deleted{0} !\nName : {1}\nFile ID : {2}',
+    'deleted_by_admins': 'Voice has been deleted{0} !\n\n<b>File ID</b> : {1}\n\n',
     'review_required': 'A new voice is ready for reviewing ⚠',
     'admin_panel': 'Admin panel activated 🔛',
     'ban_voted': 'Voice has been deleted and user got banned !',
@@ -81,7 +81,9 @@ admin_messages = {
     'review_the_voice': 'Please review the voice and submit it using these options 👇',
     'no_voice_to_review': 'There isn\'t any voice requiring a review !',
     'reviewed': 'Voice has been reviewed ✅',
-    'voice_not_accessible': 'Requested voice is not accessible anymore !'
+    'voice_not_accessible': 'Requested voice is not accessible anymore !',
+    'voice_recovered': 'Voice has been recovered ♻',
+    'voting_results': 'Voting Results 👇\n\n✅ : {0}\n❌ : {1}\n\nResults get updated every 3 minutes 🔄'
 }
 user_messages = {
     'back': 'شما به منوی اصلی بازگشتید 🔙',
@@ -192,5 +194,6 @@ user_messages = {
     'voice_deleted_before': 'ویس مورد نظر قبلا از ربات حذف شده است ⚠',
     'voice_deleted_from_list_before': 'ویس مورد نظر قبلا از لیست حذف شده است ⚠',
     'no_voting': 'شما هیچ ویسی در مرحله ی رای گیری ندارید ⚠',
-    'voice_not_accessible': 'ویس مورد نظر دیگر در دسترس نیست ⚠'
+    'voice_not_accessible': 'ویس مورد نظر دیگر در دسترس نیست ⚠',
+    'voting_results': 'نتایج رای گیری 👇\n\n✅ : {0}\n❌ : {1}\n\nنتایج هر ۳ دقیقه به روزرسانی می شوند 🔄'
 }

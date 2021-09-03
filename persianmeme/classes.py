@@ -34,6 +34,7 @@ from django.db.models import Q, Case, When, BooleanField
 from .types import ObjectType
 from requests import Session
 from .tasks import revoke_review
+from LilSholex.exceptions import TooManyRequests
 
 
 class User(Base):
@@ -65,7 +66,7 @@ class User(Base):
 
     def delete_current_voice(self):
         if self.database.current_voice:
-            self.database.current_voice.delete(admin=self.database)
+            self.database.current_voice.delete(admin=self.database, log=True)
             self.send_message(translations.admin_messages['deleted'])
         else:
             self.send_message(translations.admin_messages['deleted_before'])
@@ -74,15 +75,18 @@ class User(Base):
         if (result := models.Voice.objects.filter(
                 file_unique_id=file_unique_id, voice_type=models.Voice.Type.NORMAL, status=models.Voice.Status.ACTIVE
         )).exists():
-            result.first().delete(admin=self.database)
+            result.first().delete(admin=self.database, log=True)
 
     @sync_fix
     def __delete_voting(self, message_id: int):
         with self._session.get(
-                f'{self._BASE_URL}deleteMessage',
-                params={'chat_id': settings.MEME_CHANNEL, 'message_id': message_id}
-        ) as _:
-            pass
+            f'{self._BASE_URL}deleteMessage',
+            params={'chat_id': settings.MEME_CHANNEL, 'message_id': message_id},
+            timeout=settings.REQUESTS_TIMEOUT
+        ) as response:
+            if response.status_code != 429:
+                return
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
 
     @property
     def __pending_voices(self):
@@ -107,13 +111,17 @@ class User(Base):
         encoded = {'caption': caption, 'reply_markup': reply_markup}
         with self._session.get(
             f'{self._BASE_URL}sendVoice',
-            params={**self._BASE_PARAM, **encoded, 'voice': file_id, 'reply_to_message_id': reply_to_message_id}
-        ) as _:
-            return
+            params={**self._BASE_PARAM, **encoded, 'voice': file_id, 'reply_to_message_id': reply_to_message_id},
+            timeout=settings.REQUESTS_TIMEOUT
+        ) as response:
+            if response.status_code != 429:
+                return
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
 
     def delete_message(self, message_id: int):
         with self._session.get(
-                f'{self._BASE_URL}deleteMessage', params={**self._BASE_PARAM, 'message_id': message_id}
+            f'{self._BASE_URL}deleteMessage', params={**self._BASE_PARAM, 'message_id': message_id},
+            timeout=settings.REQUESTS_TIMEOUT
         ) as _:
             return
 
@@ -121,9 +129,12 @@ class User(Base):
     def forward_message(self, from_chat_id: int, message_id: int):
         with self._session.get(
             f'{self._BASE_URL}forwardMessage',
-            params={**self._BASE_PARAM, 'from_chat_id': from_chat_id, 'message_id': message_id}
-        ) as _:
-            return
+            params={**self._BASE_PARAM, 'from_chat_id': from_chat_id, 'message_id': message_id},
+            timeout=settings.REQUESTS_TIMEOUT
+        ) as response:
+            if response.status_code != 429:
+                return
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
 
     @sync_fix
     def copy_message(
@@ -139,11 +150,15 @@ class User(Base):
                 'from_chat_id': self.database.chat_id,
                 'chat_id': chat_id,
                 **base_param
-            } if not from_chat_id else {'from_chat_id': from_chat_id, 'chat_id': self.database.chat_id, **base_param}
-        ) as result:
-            if result.status_code == 200 and (result := result.json())['ok']:
-                return result['result']['message_id']
-            return False
+            } if not from_chat_id else {'from_chat_id': from_chat_id, 'chat_id': self.database.chat_id, **base_param},
+            timeout=settings.REQUESTS_TIMEOUT
+        ) as response:
+            if response.status_code == 200:
+                if (result := response.json())['ok']:
+                    return result['result']['message_id']
+            elif response.status_code == 429:
+                return False
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
 
     def __save_ad(self, ad: models.Ad):
         ad.seen.add(self.database)
@@ -167,7 +182,7 @@ class User(Base):
                             Q(sender=self.database)
                     ) | Q(voice_type=models.Voice.Type.NORMAL)) & Q(status=models.Voice.Status.ACTIVE)
                 ))], str())
-            except models.Voice.DoesNotExist:
+            except (models.Voice.DoesNotExist, ValueError):
                 return list(), str()
         else:
             if is_tags := query.startswith('tags:'):
@@ -184,7 +199,7 @@ class User(Base):
                 queries |= Q(tags__tag__iexact=tag)
         is_name = Case(When(name__icontains=query, then=True), default=False, output_field=BooleanField())
         result_sets = (
-            lambda:  models.RecentVoice.objects.filter(user=self.database).values_list(
+            lambda:  models.RecentVoice.objects.filter(user=self.database).select_related('voice').values_list(
                 'voice__id', 'voice__file_id', 'voice__name'
             ) if not query and self.database.use_recent_voices else tuple(),
             lambda: [
@@ -230,9 +245,14 @@ class User(Base):
     @sync_fix
     def get_chat(self):
         with self._session.get(
-                f'{self._BASE_URL}getChat', params=self._BASE_PARAM
+            f'{self._BASE_URL}getChat', params=self._BASE_PARAM,
+            timeout=settings.REQUESTS_TIMEOUT
         ) as response:
-            return response.json().get('result', {})
+            if response.status_code == 200:
+                return response.json().get('result')
+            elif response.status_code != 429:
+                return {}
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
 
     def set_username(self):
         username = self.get_chat().get('username')
@@ -246,6 +266,7 @@ class User(Base):
             if self.database in target_voice.deny_vote.all():
                 target_voice.deny_vote.remove(self.database)
             target_voice.accept_vote.add(self.database)
+            target_voice.save()
         return True
 
     def dislike_voice(self, target_voice: models.Voice):
@@ -255,6 +276,7 @@ class User(Base):
             if self.database in target_voice.accept_vote.all():
                 target_voice.accept_vote.remove(self.database)
             target_voice.deny_vote.add(self.database)
+            target_voice.save()
         return True
 
     def add_voter(self, voice: models.Voice):
@@ -280,7 +302,7 @@ class User(Base):
 
     def delete_private_voice(self):
         if self.database.current_voice.sender == self.database:
-            self.database.current_voice.delete(dont_send=True)
+            self.database.current_voice.delete()
             self.database.current_voice = None
             return True
         return False
@@ -316,7 +338,7 @@ class User(Base):
 
     def delete_suggested_voice(self):
         if self.database.current_voice.sender == self.database:
-            self.database.current_voice.delete(dont_send=True)
+            self.database.current_voice.delete()
             self.database.current_voice = None
             return True
         return False
@@ -353,15 +375,16 @@ class User(Base):
         if self.database.started and self.database.last_start and \
                 (now - self.database.last_start) <= timedelta(seconds=18000):
             return
-        while True:
-            with self._session.get(
-                    f'{self._BASE_URL}sendChatAction', params={**self._BASE_PARAM, 'action': 'upload_voice'}
-            ) as response:
-                if response.status_code != 429:
-                    self.database.started = response.status_code == 200
-                    if self.database.started:
-                        self.database.last_start = now
-                    return
+        with self._session.get(
+            f'{self._BASE_URL}sendChatAction', params={**self._BASE_PARAM, 'action': 'upload_voice'},
+            timeout=settings.REQUESTS_TIMEOUT
+        ) as response:
+            if response.status_code != 429:
+                self.database.started = response.status_code == 200
+                if self.database.started:
+                    self.database.last_start = now
+                return
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
 
     def voice_exists(self, message: dict):
         if 'voice' in message and ('mime_type' not in message['voice'] or message['voice']['mime_type'] == 'audio/ogg'):
@@ -597,7 +620,10 @@ class User(Base):
 
     def assign_voice(self):
         if (assigned_voice := models.Voice.objects.filter(
-                assigned_admin=self.database, reviewed=False, voice_type=models.Voice.Type.NORMAL
+            assigned_admin=self.database,
+            reviewed=False,
+            voice_type=models.Voice.Type.NORMAL,
+            status=models.Voice.Status.ACTIVE
         )).exists():
             self.database.current_voice = assigned_voice.first()
         elif (new_voice := models.Voice.objects.filter(
@@ -616,6 +642,6 @@ class User(Base):
         self.send_message(
             translations.admin_messages['review_the_voice'],
             voice_review,
-            self.database.current_voice.send_voice(self.database.chat_id, False, self._session)
+            self.database.current_voice.send_voice(self.database.chat_id, self._session)
         )
         return True

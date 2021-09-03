@@ -54,12 +54,22 @@ edit_voice = {'keyboard': [['Edit Name', 'Edit Tags'], ['Done ✔'], ['Back 🔙
 voice_review = {'keyboard': [
     ['Edit Name', 'Edit Tags'], ['Delete 🗑', 'Check the Voice'], ['Done ✔', 'Done and Next ⏭'], ['Back 🔙']
 ], 'resize_keyboard': True}
+deleted = {'inline_keyboard': [[{'text': 'Deleted 🗑', 'callback_data': 'none'}]]}
+recovered = {'inline_keyboard': [[{'text': 'Recovered ♻', 'callback_data': 'none'}]]}
 
 
-def voice(accept_count: int = 0, deny_count: int = 0):
+def suggestion_vote(voice_id: int):
     return {'inline_keyboard': [[
-        {'text': f'✅ : {accept_count} ', 'callback_data': 'accept'},
-        {'text': f'❌ : {deny_count}', 'callback_data': 'deny'}
+        {'text': '✅', 'callback_data': f'a:{voice_id}'},
+        {'text': 'نتایج 📊', 'callback_data': f're:{voice_id}'},
+        {'text': '❌', 'callback_data': f'd:{voice_id}'}
+    ]]}
+
+
+def voice_recovery(voice_id: int):
+    return {'inline_keyboard': [[
+        {'text': 'Recover', 'callback_data': f'r:{voice_id}'},
+        {'text': 'Delete', 'callback_data': f'rd:{voice_id}'}
     ]]}
 
 

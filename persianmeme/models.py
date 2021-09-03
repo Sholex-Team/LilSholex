@@ -3,10 +3,11 @@ import requests
 from django.conf import settings
 from django.db import models
 from LilSholex.decorators import sync_fix
-from .keyboards import voice as voice_keyboard
+from .keyboards import voice_recovery
 from asgiref.sync import sync_to_async
 from uuid import uuid4
 from . import translations
+from LilSholex.exceptions import TooManyRequests
 
 
 class VoiceTag(models.Model):
@@ -146,6 +147,7 @@ class Voice(models.Model):
     class Status(models.TextChoices):
         ACTIVE = 'a', 'Active'
         PENDING = 'p', 'Pending'
+        DELETED = 'd', 'Deleted'
 
     class Type(models.TextChoices):
         NORMAL = 'n', 'Normal'
@@ -157,19 +159,17 @@ class Voice(models.Model):
         self.deny()
 
     def delete(self, *args, **kwargs):
-        if not kwargs.get('dont_send'):
-            from .functions import send_message
-            admin = f' by {kwargs.pop("admin")}' if kwargs.get('admin') else ''
-            send_message(
+        if kwargs.get('log'):
+            self.send_voice(
                 settings.MEME_LOGS,
-                translations.admin_messages['deleted_by_admins'].format(admin, self.name, self.file_id)
+                kwargs.get('http_session', requests.Session()),
+                voice_recovery(self.id),
+                translations.admin_messages['deleted_by_admins'].format(
+                    f' by {kwargs.pop("admin")}' if kwargs.get('admin') else '', self.file_id
+                )
             )
-            send_message(
-                self.sender.chat_id,
-                translations.user_messages['deleted_by_admins'].format(self.name)
-            )
-        else:
-            del kwargs['dont_send']
+            self.status = self.Status.DELETED
+            return self.save()
         super().delete(*args, **kwargs)
 
     message_id = models.BigIntegerField(verbose_name='Message ID', null=True, blank=True)
@@ -207,7 +207,7 @@ class Voice(models.Model):
 
     def user_deny(self):
         sender = self.sender
-        self.delete(dont_send=True)
+        self.delete()
         return sender
 
     def accept(self):
@@ -223,39 +223,37 @@ class Voice(models.Model):
     def deny(self):
         from .functions import send_message
         send_message(self.sender.chat_id, translations.user_messages['voice_denied'])
-        self.delete(dont_send=True)
-
-    def edit_vote_count(self):
-        while True:
-            try:
-                if requests.get(f'https://api.telegram.org/bot{settings.MEME}/editMessageReplyMarkup', params={
-                    'chat_id': settings.MEME_CHANNEL,
-                    'message_id': self.message_id,
-                    'reply_markup': json.dumps(voice_keyboard(self.accept_vote.count(), self.deny_vote.count()))
-                }) == 429:
-                    raise requests.RequestException()
-            except requests.RequestException:
-                continue
-            break
+        self.delete()
 
     @sync_fix
-    def send_voice(self, chat_id: int, send_voice_keyboard, session: requests.Session) -> int:
+    def send_voice(
+            self,
+            chat_id: int,
+            session: requests.Session = requests.Session(),
+            voice_keyboard: dict = None,
+            extra_text: str = ''
+    ) -> int:
         tags_string = str()
         for tag in self.tags.all():
             tags_string += f'\n<code>{tag.tag}</code>'
         voice_dict = {
-            'caption': f'<b>Voice Name</b>: {self.name}\n\n<b>Voice Tags 👇</b>{tags_string}',
-            'parse_mode': 'Html',
+            'caption': f'{extra_text}<b>Voice Name</b>: <code>{self.name}</code>\n\n<b>Voice Tags 👇</b>{tags_string}',
+            'parse_mode': 'HTML',
             'voice': self.file_id,
             'chat_id': chat_id
         }
-        if send_voice_keyboard:
-            voice_dict['reply_markup'] = json.dumps(voice_keyboard())
-        with session.get(f'https://api.telegram.org/bot{settings.MEME}/sendVoice', params=voice_dict) as response:
-            response = response.json()
-            if response['ok']:
-                return response['result']['message_id']
-        return 0
+        if voice_keyboard:
+            voice_dict['reply_markup'] = json.dumps(voice_keyboard)
+        with session.get(
+                f'https://api.telegram.org/bot{settings.MEME}/sendVoice',
+                params=voice_dict,
+                timeout=settings.REQUESTS_TIMEOUT * 10
+        ) as response:
+            if response.status_code == 200:
+                return response.json()['result']['message_id']
+            elif response.status_code != 429:
+                return 0
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
 
 
 class Ad(models.Model):

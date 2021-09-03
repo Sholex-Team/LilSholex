@@ -1,6 +1,6 @@
 from django.contrib import admin
 from persianmeme import models
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpRequest
 from django.core.serializers import serialize
 from persianmeme.functions import delete_vote_sync
 from django.conf import settings
@@ -49,7 +49,7 @@ def count_tags(obj: models.Voice):
 @admin.register(models.User)
 class User(admin.ModelAdmin):
     @admin.display(description='Ban')
-    def ban_user(self, request, queryset):
+    def ban_user(self, request: HttpRequest, queryset):
         result = queryset.update(status='b')
         if result == 0:
             self.message_user(request, 'There is no need to banned these users !')
@@ -59,7 +59,7 @@ class User(admin.ModelAdmin):
             self.message_user(request, f'{result} Users have been banned !')
 
     @admin.display(description='Full Ban')
-    def full_ban(self, request, queryset):
+    def full_ban(self, request: HttpRequest, queryset):
         result = queryset.update(status='f')
         if result == 0:
             self.message_user(request, 'There is no need to full banned these users !')
@@ -69,14 +69,14 @@ class User(admin.ModelAdmin):
             self.message_user(request, f'{result} Users have been banned !')
 
     @admin.display(description='Unban')
-    def unban_user(self, request, queryset):
+    def unban_user(self, request: HttpRequest, queryset):
         result = queryset.update(status='a')
         if result == 0:
             self.message_user(request, 'There is no need to unbanned these users !')
         elif result == 1:
             self.message_user(request, '1 User has been unbanned .')
         else:
-            self.message_user(request, f'{result} Users have been unbanned .')
+            self.message_user(request, f'{result} Users have been unbanned.')
 
     unban_user.allowed_permissions = change_permission
     ban_user.allowed_permissions = change_permission
@@ -128,7 +128,7 @@ class User(admin.ModelAdmin):
 @admin.register(models.Voice)
 class Voice(admin.ModelAdmin):
     @admin.display(description='Accept Votes')
-    def accept_vote(self, request, queryset):
+    def accept_vote(self, request: HttpRequest, queryset):
         result = [
             (target_voice, target_voice.accept(), delete_vote_sync(target_voice.message_id))
             for target_voice in queryset if target_voice.status == 'p'
@@ -142,7 +142,7 @@ class Voice(admin.ModelAdmin):
             self.message_user(request, f'{result_len} Voices have been accepted !')
 
     @admin.display(description='Deny Vote')
-    def deny_vote(self, request, queryset):
+    def deny_vote(self, request: HttpRequest, queryset):
         result = [
             (target_voice, target_voice.deny(), delete_vote_sync(target_voice.message_id))
             for target_voice in queryset if target_voice.status == 'p'
@@ -158,7 +158,7 @@ class Voice(admin.ModelAdmin):
                 self.message_user(request, f'{result_len} Voices have been denied !')
 
     @admin.display(description='Add Fake Deny Votes')
-    def add_fake_deny_votes(self, request, queryset):
+    def add_fake_deny_votes(self, request: HttpRequest, queryset):
         if (user_count := models.User.objects.count()) < settings.MIN_FAKE_VOTE:
             fake_min = user_count
             fake_max = user_count
@@ -180,21 +180,33 @@ class Voice(admin.ModelAdmin):
             self.message_user(request, 'Fake votes have been added to a voice !')
         else:
             self.message_user(request, f'Fake votes has been added to {faked_count} voices !')
+    
+    @admin.display(description='Recover Voices')
+    def recover_voices(self, request: HttpRequest, queryset):
+        if not (recovered_voices_count := queryset.filter(status=models.Voice.Status.DELETED).update(
+                status=models.Voice.Status.ACTIVE
+        )):
+            self.message_user(request, 'There isn\'t any voice to recover !')
+        elif recovered_voices_count == 1:
+            self.message_user(request, 'One voice has been recovered.')
+        else:
+            self.message_user(request, f'{recovered_voices_count} Voices have been recovered.')
 
     add_fake_deny_votes.allowed_permissions = change_permission
+    recover_voices.allowed_permissions = change_permission
     date_hierarchy = 'date'
     list_display = (
         'id', 'name', 'sender', 'votes', 'status', 'usage_count', count_deny_votes, count_accept_votes, count_tags
     )
     list_filter = ('status', 'voice_type', 'reviewed')
     search_fields = ('name', 'sender__chat_id', 'file_id', 'file_unique_id', 'id', 'sender__user_id')
-    actions = (export_json, accept_vote, deny_vote, add_fake_deny_votes)
+    actions = (export_json, accept_vote, deny_vote, add_fake_deny_votes, recover_voices)
     list_per_page = 15
     readonly_fields = ('id', 'date')
     raw_id_fields = ('sender', 'voters', 'accept_vote', 'deny_vote', 'tags', 'assigned_admin')
     fieldsets = (
         ('Information', {'fields': (
-            'id', 'file_id', 'name', 'file_unique_id', 'date', 'sender', 'tags', 'assigned_admin'
+            'id', 'file_id', 'name', 'file_unique_id', 'date', 'sender', 'tags', 'assigned_admin', 'message_id'
         )}),
         ('Status', {'fields': (
             'status', 'votes', 'voice_type', 'voters', 'accept_vote', 'deny_vote', 'usage_count', 'reviewed'

@@ -1,6 +1,7 @@
 from aiohttp import ClientError
 from requests import RequestException
 from asyncio import sleep
+from .exceptions import TooManyRequests
 
 
 def async_fix(func):
@@ -19,6 +20,8 @@ def sync_fix(func):
         while True:
             try:
                 return func(*args, **kwargs)
+            except TooManyRequests as e:
+                sleep(e.retry_after)
             except RequestException:
                 continue
 

@@ -35,13 +35,3 @@ def check_voice(voice_id: int):
             voice.accept()
         else:
             voice.deny()
-
-
-@background(schedule=180)
-def update_votes(voice_id: int):
-    try:
-        voice = Voice.objects.get(id=voice_id, status=Voice.Status.PENDING)
-    except Voice.DoesNotExist:
-        return
-    voice.edit_vote_count()
-    update_votes(voice_id)

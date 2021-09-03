@@ -4,6 +4,8 @@ from persianmeme.models import User as PersianMemeUser
 from typing import Union
 from abc import ABC, abstractmethod
 from requests import Session
+from django.conf import settings
+from .exceptions import TooManyRequests
 
 
 class Base(ABC):
@@ -52,20 +54,26 @@ class Base(ABC):
                 'reply_to_message_id': reply_to_message_id,
                 'parse_mode': parse_mode if parse_mode else str(),
                 'disable_web_page_preview': str(disable_web_page_preview)
-            }
+            },
+            timeout=settings.REQUESTS_TIMEOUT
         ) as response:
-            response = response.json()
-            if response['ok']:
-                return response['result']['message_id']
-            return 0
+            if response.status_code == 200:
+                if (result := response.json())['ok']:
+                    return result['result']['message_id']
+            elif response.status_code != 429:
+                return 0
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
 
     @sync_fix
     def delete_message(self, message_id: int) -> None:
         with self._session.get(
             f'{self._BASE_URL}deleteMessage',
-            params={**self._BASE_PARAM, 'message_id': message_id}
-        ) as _:
-            return
+            params={**self._BASE_PARAM, 'message_id': message_id},
+            timeout=settings.REQUESTS_TIMEOUT
+        ) as response:
+            if response.status_code != 429:
+                return
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
 
     @sync_fix
     def edit_message_text(self, message_id: int, text: str, inline_keyboard: dict = str()):
@@ -73,9 +81,12 @@ class Base(ABC):
             inline_keyboard = json.dumps(inline_keyboard)
         with self._session.get(
             f'{self._BASE_URL}editMessageText',
-            params={**self._BASE_PARAM, 'message_id': message_id, 'text': text, 'reply_markup': inline_keyboard}
-        ) as _:
-            return
+            params={**self._BASE_PARAM, 'message_id': message_id, 'text': text, 'reply_markup': inline_keyboard},
+            timeout=settings.REQUESTS_TIMEOUT
+        ) as response:
+            if response.status_code != 429:
+                return
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
 
     @sync_fix
     def send_animation(
@@ -95,8 +106,10 @@ class Base(ABC):
             'reply_markup': reply_markup,
             'reply_to_message_id': reply_to_message_id,
             'parse_mode': parse_mode
-        }):
-            return
+        }, timeout=settings.REQUESTS_TIMEOUT) as response:
+            if response.status_code != 429:
+                return
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
 
     @abstractmethod
     def go_back(self):

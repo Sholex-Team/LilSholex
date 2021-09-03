@@ -2,7 +2,7 @@ from django.conf import settings
 from LilSholex import decorators
 from LilSholex.functions import answer_callback_query as answer_callback_query_closure
 from . import models
-import requests
+from requests import Session as RequestsSession
 from .models import Broadcast
 from .translations import user_messages
 from asgiref.sync import sync_to_async
@@ -11,6 +11,8 @@ from django.core.paginator import Paginator
 import asyncio
 from django import db
 from .types import ObjectType
+import json
+from LilSholex.exceptions import TooManyRequests
 
 
 def get_vote(file_unique_id):
@@ -51,32 +53,33 @@ def answer_inline_query(
         inline_query_id: str,
         results: str,
         next_offset: str,
-        cache_time: float,
-        is_personal: bool,
         switch_pm_text: str,
         switch_pm_parameter: str,
-        session: requests.Session
+        session: RequestsSession
 ):
     with session.get(
         f'https://api.telegram.org/bot{settings.MEME}/answerInlineQuery',
         params={
             'results': results,
             'next_offset': next_offset,
-            'cache_time': cache_time,
-            'is_personal': str(is_personal),
             'switch_pm_text': switch_pm_text,
             'switch_pm_parameter': switch_pm_parameter,
-            'inline_query_id': inline_query_id
-        }
-    ):
-        return
+            'inline_query_id': inline_query_id,
+            'cache_time': 0
+        },
+        timeout=settings.REQUESTS_TIMEOUT
+    ) as response:
+        if response.status_code != 429:
+            return
+        raise TooManyRequests(response.json()['parameters']['retry_after'])
 
 
 @decorators.sync_fix
-def delete_vote_sync(message_id: int, session: requests.Session = requests.Session()):
+def delete_vote_sync(message_id: int, session: RequestsSession = RequestsSession()):
     with session.get(
         f'https://api.telegram.org/bot{settings.MEME}/deleteMessage',
-        params={'chat_id': settings.MEME_CHANNEL, 'message_id': message_id}
+        params={'chat_id': settings.MEME_CHANNEL, 'message_id': message_id},
+        timeout=settings.REQUESTS_TIMEOUT
     ) as _:
         return
 
@@ -87,7 +90,7 @@ def check_voice(file_unique_id: str):
         return target_voice.first()
 
 
-def answer_callback_query(session: requests.Session):
+def answer_callback_query(session: RequestsSession):
     return answer_callback_query_closure(session, settings.MEME)
 
 
@@ -99,11 +102,14 @@ def get_delete(delete_id: int):
 
 
 @decorators.sync_fix
-def send_message(chat_id: int, text: str):
-    requests.get(
+def send_message(chat_id: int, text: str, session: RequestsSession = RequestsSession()):
+    with session.get(
         f'https://api.telegram.org/bot{settings.MEME}/sendMessage',
         params={'chat_id': chat_id, 'text': text}
-    )
+    ) as response:
+        if response.status_code != 429:
+            return
+        raise TooManyRequests(response.json()['parameters']['retry_after'])
 
 
 def accept_voice(file_unique_id: str):
@@ -132,19 +138,21 @@ def get_page(broadcast: models.Broadcast):
 async def perform_broadcast(broadcast: Broadcast):
     from_chat_id = (await broadcast.get_sender).chat_id
     message_id = broadcast.message_id
-    async with ClientSession(connector=TCPConnector(limit=settings.BROADCAST_CONNECTION_LIMIT)) as client:
+    async with ClientSession(connector=TCPConnector(
+            limit=settings.BROADCAST_CONNECTION_LIMIT
+    )) as client:
         async def forwarder(chat_id: int):
             while True:
                 try:
                     async with client.get(
-                            f'https://api.telegram.org/bot{settings.MEME}/forwardMessage',
-                            params={'from_chat_id': from_chat_id, 'chat_id': chat_id, 'message_id': message_id}
+                        f'https://api.telegram.org/bot{settings.MEME}/forwardMessage',
+                        params={'from_chat_id': from_chat_id, 'chat_id': chat_id, 'message_id': message_id}
                     ) as request_result:
                         if request_result.status != 429:
                             break
-                except ClientError:
+                        await asyncio.sleep((await request_result.json())['parameters']['retry_after'])
+                except (ClientError, asyncio.TimeoutError):
                     pass
-                await asyncio.sleep(0.6)
         while result := await get_page(broadcast):
             first_index = 0
             for last_index in range(settings.BROADCAST_LIMIT, settings.PAGINATION_LIMIT + 1, settings.BROADCAST_LIMIT):
@@ -232,3 +240,28 @@ def create_voice_list(voices: tuple):
     for voice in voices:
         voices_str += f'⭕ {voice.name}\n'
     return voices_str
+
+
+@decorators.sync_fix
+def edit_message_reply_markup(
+        chat_id: int,
+        new_reply_markup: dict,
+        message_id: int = None,
+        inline_message_id: int = None,
+        session: RequestsSession = RequestsSession()
+):
+    assert message_id is not None or inline_message_id is not None,\
+        'You must at least provide message_id or inline_message_id !'
+    params = {'chat_id': chat_id, 'reply_markup': json.dumps(new_reply_markup)}
+    if message_id:
+        params['message_id'] = message_id
+    else:
+        params['inline_message_id'] = inline_message_id
+    with session.get(
+        f'https://api.telegram.org/bot{settings.MEME}/editMessageReplyMarkup',
+        timeout=(settings.REQUESTS_TIMEOUT * 20),
+        params=params
+    ) as response:
+        if response.status_code != 429:
+            return
+        raise TooManyRequests(response.json()['parameters']['retry_after'])

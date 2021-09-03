@@ -12,9 +12,13 @@ class Command(BaseCommand):
             db.close_old_connections()
             broadcast = Broadcast.objects.filter(sent=False)
             if broadcast.exists():
+                self.stdout.write('Processing a broadcast.')
                 broadcast = broadcast.first()
                 asyncio.run(perform_broadcast(broadcast))
                 broadcast.sent = True
                 db.close_old_connections()
                 broadcast.save()
+                self.stdout.write('Broadcast has been processed.')
+                return sleep(15)
+            self.stdout.write('There isn\'t any broadcast to process !')
             sleep(15)

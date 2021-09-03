@@ -35,8 +35,6 @@ def webhook(request):
                 inline_query_id,
                 str(),
                 str(),
-                0,
-                True,
                 user.translate('start_the_bot'),
                 'new_user',
                 request.http_session
@@ -51,8 +49,6 @@ def webhook(request):
                 inline_query_id,
                 json.dumps(results),
                 next_offset,
-                0,
-                True,
                 user.translate('add_sound'),
                 'suggest_voice',
                 request.http_session
@@ -76,7 +72,6 @@ def webhook(request):
         try:
             message = callback_query['message']
         except KeyError:
-            message = None
             message_id = None
         else:
             message_id = message['message_id']
@@ -145,19 +140,25 @@ def webhook(request):
                 inliner.database.menu_mode = inliner.database.MenuMode.USER
                 answer_query(query_id, translations.user_messages['managing_voice'], False)
                 inliner.send_message(translations.user_messages['manage_voice'], keyboards.manage_voice)
-        elif callback_data[0] in ('accept', 'deny') and message.get('voice'):
-            if target_voice := functions.check_voice(message['voice']['file_unique_id']):
-                if callback_data[0] == 'accept':
-                    if not inliner.like_voice(target_voice):
-                        answer_query(query_id, inliner.translate('vote_before'), True)
-                    else:
-                        answer_query(query_id, inliner.translate('voted'), False)
+        elif callback_data[0] in (vote_options := ('a', 'd', 're')):
+            try:
+                target_voice = models.Voice.objects.get(id=callback_data[1])
+            except models.Voice.DoesNotExist:
+                return HttpResponse(status=200)
+            if callback_data[0] == vote_options[0]:
+                if not inliner.like_voice(target_voice):
+                    answer_query(query_id, inliner.translate('vote_before'), True)
                 else:
-                    if not inliner.dislike_voice(target_voice):
-                        answer_query(query_id, inliner.translate('vote_before'), True)
-                    else:
-                        answer_query(query_id, inliner.translate('voted'), False)
-                target_voice.save()
+                    answer_query(query_id, inliner.translate('voted'), False)
+            elif callback_data[0] == vote_options[1]:
+                if not inliner.dislike_voice(target_voice):
+                    answer_query(query_id, inliner.translate('vote_before'), True)
+                else:
+                    answer_query(query_id, inliner.translate('voted'), False)
+            else:
+                answer_query(query_id, inliner.translate(
+                    'voting_results', target_voice.accept_vote.count(), target_voice.deny_vote.count()
+                ), True, 180)
         elif callback_data[0] in ('up', 'down'):
             try:
                 voice = models.Voice.objects.get(id=callback_data[1])
@@ -180,7 +181,7 @@ def webhook(request):
                     answer_query(query_id, inliner.translate('took_vote_back'), False)
                 else:
                     answer_query(query_id, inliner.translate('not_voted'), True)
-        elif inliner.database.rank in models.BOT_ADMINS:
+        elif inliner.database.rank == inliner.database.Rank.OWNER:
             if callback_data[0] in (message_options := ('read', 'ban', 'reply')):
                 inliner.delete_message(message_id)
                 if not (target_message := functions.get_message(callback_data[1])):
@@ -208,31 +209,47 @@ def webhook(request):
                     inliner.database.temp_user_id = user.database.chat_id
                     inliner.send_message(translations.admin_messages['reply'], keyboards.en_back)
                     answer_query(query_id, translations.admin_messages['replying'], False)
-            elif callback_data[0] in ('delete', 'delete_deny'):
+            elif callback_data[0] in (delete_options := ('delete', 'delete_deny')):
                 if not (target_delete := functions.get_delete(callback_data[1])):
                     return HttpResponse(status=200)
                 user = classes.User(
                     request.http_session, classes.User.Mode.NORMAL, instance=target_delete.user
                 )
-                if callback_data[0] == 'delete':
+                if callback_data[0] == delete_options[0]:
                     target_delete.voice.delete()
                     answer_query(query_id, translations.admin_messages['deleted'], True)
                     user.send_message(user.translate('deleted'))
-                elif callback_data[0] == 'delete_deny':
+                elif callback_data[0] == delete_options[1]:
                     target_delete.delete()
                     answer_query(query_id, translations.admin_messages['denied'], False)
                     user.send_message(user.translate('delete_denied'))
                 inliner.delete_message(message_id)
+            elif callback_data[0] in (deleted_voice_options := ('r', 'rd')):
+                try:
+                    deleted_voice = models.Voice.objects.get(id=callback_data[1], status=models.Voice.Status.DELETED)
+                except models.Voice.DoesNotExist:
+                    return HttpResponse(status=200)
+                user = classes.User(request.http_session, classes.User.Mode.NORMAL, instance=deleted_voice.sender)
+                if callback_data[0] == deleted_voice_options[0]:
+                    deleted_voice.status = deleted_voice.Status.ACTIVE
+                    deleted_voice.save()
+                    answer_query(query_id, translations.admin_messages['voice_recovered'], True)
+                    functions.edit_message_reply_markup(
+                        settings.MEME_LOGS, keyboards.recovered, message_id=message_id, session=request.http_session
+                    )
+                else:
+                    deleted_voice.delete()
+                    user.send_message(translations.user_messages['deleted_by_admins'].format(deleted_voice.name))
+                    functions.edit_message_reply_markup(
+                        settings.MEME_LOGS, keyboards.deleted, message_id=message_id, session=request.http_session
+                    )
         inliner.database.save()
     else:
-        if 'message' in update:
-            message = update['message']
-        else:
+        message = update['message']
+        if message['chat']['id'] < 0:
             return HttpResponse(status=200)
         text = message.get('text', None)
         message_id = message['message_id']
-        if message['chat']['id'] < 0:
-            return HttpResponse(status=200)
         user = classes.User(request.http_session, classes.User.Mode.SEND_AD, message['chat']['id'])
         user.set_username()
         user.send_ad()
@@ -605,7 +622,7 @@ def webhook(request):
                         if not user.assign_voice():
                             user.go_back()
                     elif text == 'Check the Voice':
-                        user.database.current_voice.send_voice(user.database.chat_id, False, request.http_session)
+                        user.database.current_voice.send_voice(user.database.chat_id, request.http_session)
                     elif text in (done_options := ('Done ✔', 'Done and Next ⏭')):
                         user.database.current_voice.reviewed = True
                         user.database.current_voice.save()
@@ -747,10 +764,9 @@ def webhook(request):
                     ):
                         user.database.menu = user.database.Menu.USER_MAIN
                         target_voice.message_id = target_voice.send_voice(
-                            settings.MEME_CHANNEL, True, request.http_session
+                            settings.MEME_CHANNEL, request.http_session, keyboards.suggestion_vote(target_voice.id)
                         )
                         tasks.check_voice(target_voice.id)
-                        tasks.update_votes(target_voice.id)
                         user.send_message(
                             user.translate('suggestion_sent'),
                             keyboards.user
