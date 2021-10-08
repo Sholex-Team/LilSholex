@@ -95,7 +95,7 @@ services:
     - "443:443/tcp"
     - "80:80/tcp"
   gunicorn:
-    image: ghcr.io/sholex-team/lilsholex/lilsholex:5.0
+    image: ghcr.io/sholex-team/lilsholex/lilsholex:5.1
     networks:
       - db_django
       - nginx_lilsholex
@@ -144,7 +144,7 @@ services:
         source: persianmeme
         target: /home/sholex/persianmeme/migrations
   tasks:
-    image: ghcr.io/sholex-team/lilsholex/lilsholex:5.0
+    image: ghcr.io/sholex-team/lilsholex/lilsholex:5.1
     command: bash -c "python manage.py clear_tasks && python manage.py process_tasks --sleep 15"
     networks:
       - db_django
@@ -187,7 +187,7 @@ services:
         source: persianmeme
         target: /home/sholex/persianmeme/migrations
   broadcasts:
-    image: ghcr.io/sholex-team/lilsholex/lilsholex:5.0
+    image: ghcr.io/sholex-team/lilsholex/lilsholex:5.1
     command: "python manage.py process_broadcasts"
     networks:
       - db_django
@@ -230,7 +230,7 @@ services:
         source: persianmeme
         target: /home/sholex/persianmeme/migrations
   migrations:
-    image: ghcr.io/sholex-team/lilsholex/lilsholex:5.0
+    image: ghcr.io/sholex-team/lilsholex/lilsholex:5.1
     command: "bash -c 'yes | python manage.py makemigrations persianmeme && yes | python manage.py migrate &&\
     python manage.py collectstatic --noinput'"
     secrets:
