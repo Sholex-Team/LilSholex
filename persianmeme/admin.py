@@ -221,6 +221,7 @@ class Ad(admin.ModelAdmin):
     search_fields = ('chat_id', 'message_id', 'seen__chat_id')
     list_filter = ('chat_id',)
     fieldsets = (('Information', {'fields': ('ad_id', 'chat_id', 'message_id', 'seen')}),)
+    raw_id_fields = ('seen',)
 
 
 @admin.register(models.Delete)

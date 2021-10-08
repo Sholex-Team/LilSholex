@@ -34,7 +34,7 @@ def get_voice(file_unique_id: str, voice_type=models.Voice.Type.NORMAL):
 
 def get_admin_voice(voice_id: int):
     try:
-        return models.Voice.objects.get(voice_id=voice_id)
+        return models.Voice.objects.get(id=voice_id)
     except (models.Voice.DoesNotExist, ValueError):
         return None
 

@@ -56,7 +56,7 @@ class User(Base):
         super().__init__(settings.MEME, chat_id, instance, session)
 
     def broadcast(self, message_id: int):
-        models.Broadcast.objects.create(sender=self.database, message_id=message_id)
+        return models.Broadcast.objects.create(sender=self.database, message_id=message_id).id
 
     def get_user(self):
         user = models.User.objects.get_or_create(chat_id=self.chat_id)[0]
@@ -140,7 +140,8 @@ class User(Base):
     def copy_message(
             self, message_id: int, reply_markup: dict = '', from_chat_id: int = None,  chat_id: int = None
     ):
-        assert chat_id or from_chat_id, 'You must use a chat_id or a from_chat_id !'
+        assert (chat_id and not from_chat_id) or (from_chat_id and not chat_id),\
+            'You must use a chat_id or a from_chat_id !'
         if reply_markup:
             reply_markup = json.dumps(reply_markup)
         base_param = {'message_id': message_id, 'reply_markup': reply_markup}
@@ -156,7 +157,7 @@ class User(Base):
             if response.status_code == 200:
                 if (result := response.json())['ok']:
                     return result['result']['message_id']
-            elif response.status_code == 429:
+            elif response.status_code != 429:
                 return False
             raise TooManyRequests(response.json()['parameters']['retry_after'])
 
@@ -166,7 +167,7 @@ class User(Base):
 
     def send_ad(self):
         for ad in self.__ads:
-            self.forward_message(ad.chat_id, ad.message_id)
+            self.copy_message(ad.message_id, from_chat_id=ad.chat_id)
             self.__save_ad(ad)
 
     def get_voices(self, query: str, offset: str):
@@ -208,14 +209,14 @@ class User(Base):
                     queries
                 ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct()
             ],
-            lambda: models.Voice.objects.values_list('id', 'file_id', 'name').filter(
-                queries & Q(sender=self.database) & Q(voice_type=models.Voice.Type.PRIVATE)
-            ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct(),
             lambda: self.database.favorite_voices.values_list('id', 'file_id', 'name').filter(
                 queries & Q(status=models.Voice.Status.ACTIVE)
             ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct(),
             lambda: models.Voice.objects.values_list('id', 'file_id', 'name').filter(
-                queries & Q(status=models.Voice.Status.ACTIVE) & Q(voice_type=models.Voice.Type.NORMAL)
+                queries & (
+                    (Q(status=models.Voice.Status.ACTIVE) & Q(voice_type=models.Voice.Type.NORMAL)) |
+                    (Q(sender=self.database) & Q(voice_type=models.Voice.Type.PRIVATE))
+                )
             ).annotate(is_name=is_name).order_by('-is_name', self.database.voice_order).distinct()
         )
         if len(splinted_offset := offset.split(':')) != len(result_sets):
@@ -359,7 +360,7 @@ class User(Base):
     
     def __perform_back_callback(self, callback: str):
         if callback:
-            return getattr(self, callback)
+            return getattr(self, callback)()
 
     def go_back(self):
         step = self.__back_menu

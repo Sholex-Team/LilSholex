@@ -1,4 +1,4 @@
-FROM python:3.9.6
+FROM python:3.10.0
 # Addding requirements
 COPY requirements.txt requirements.txt
 RUN pip install -U pip && pip install -r requirements.txt --no-cache-dir
@@ -16,5 +16,4 @@ COPY persianmeme persianmeme
 # Setting Volumes
 VOLUME /home/sholex/persianmeme/migrations
 # Running
-CMD gunicorn --workers=1 --threads=2 --bind=0.0.0.0:80 \
---access-logfile /dev/null --error-logfile /dev/stderr LilSholex.wsgi
+CMD gunicorn --workers=2 --bind=0.0.0.0:80 --access-logfile /dev/null --error-logfile /dev/stderr LilSholex.wsgi

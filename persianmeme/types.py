@@ -3,18 +3,11 @@ from enum import Enum, unique, auto
 
 @unique
 class ObjectType(Enum):
-    PLAYLIST_VOICE = auto()
-    PLAYLIST = auto()
-    PRIVATE_VOICE = auto()
-    FAVORITE_VOICE = auto()
-    SUGGESTED_VOICE = auto()
-
-    @staticmethod
-    def check_value(value: str):
-        try:
-            return ObjectType(int(value))
-        except (ValueError, TypeError):
-            return None
+    PLAYLIST_VOICE = '1'
+    PLAYLIST = '2'
+    PRIVATE_VOICE = '3'
+    FAVORITE_VOICE = '4'
+    SUGGESTED_VOICE = '5'
 
 
 class InvalidVoiceTag(ValueError):

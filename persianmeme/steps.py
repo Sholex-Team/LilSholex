@@ -40,8 +40,7 @@ admin_steps = {
         'menu': User.Menu.ADMIN_VOICE_REVIEW,
         'message': translations.admin_messages['review_the_voice'],
         'keyboard': keyboards.voice_review,
-        'before': 'main',
-        'callback': 'clear_current_voice'
+        'before': 'main'
     }
 }
 user_steps = {

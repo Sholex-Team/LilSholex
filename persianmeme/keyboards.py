@@ -4,11 +4,12 @@ owner = {'keyboard': [
     ['Add Sound', 'Delete Sound', 'Voice Count', 'Member Count'],
     ['Ban a User', 'Unban a User', 'Full Ban'],
     ['Broadcast', 'Message User'],
-    ['Get Voice', 'Get User'],
+    ['Get Voice', 'Get User', 'Started Count'],
     ['Add Ad', 'Delete Ad', 'Edit Ad'],
     ['Accept Voice', 'Ban Vote', 'Deny Voice'],
     ['Edit Voice', 'File ID', 'Voice Review'],
-    ['Messages', 'Delete Requests']
+    ['Messages', 'Delete Requests'],
+    ['Broadcast Status']
 ], 'resize_keyboard': True}
 user = {'keyboard': [
     ['راهنما 🔰'],
@@ -37,7 +38,7 @@ settings = {'keyboard': [
 ], 'resize_keyboard': True}
 manage_voice_list = {'keyboard': [['افزودن ویس ⏬', 'مشاهده ی ویس ها 📝'], ['بازگشت 🔙']], 'resize_keyboard': True}
 manage_suggestions = {'keyboard': [['پیشنهاد ویس 🔥', 'مشاهده ی ویس ها 📝'], ['بازگشت 🔙']], 'resize_keyboard': True}
-discord = {'inline_keyboard': [[{'text': 'Discord 🎮', 'url': 'https://discord.gg/PersianMeme'}]]}
+discord = {'inline_keyboard': [[{'text': 'Discord 🎮', 'url': 'https://discord.gg/u8aAzG3SAf'}]]}
 group = {'inline_keyboard': [[{'text': 'گروه عمومی 👥', 'url': 'https://t.me/persianmemeofficial'}]]}
 admin_message = {'inline_keyboard': [[{'text': 'پیام از طرف مدیریت 👆', 'callback_data': 'none'}]]}
 manage_playlists = {'keyboard': [

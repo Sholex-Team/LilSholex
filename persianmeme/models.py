@@ -68,7 +68,8 @@ class User(models.Model):
         ADMIN_EDIT_VOICE_NAME = 46, 'Admin Edit Voice Name',
         ADMIN_EDIT_VOICE_TAGS = 47, 'Admin Edit Voice Tags',
         ADMIN_FILE_ID = 48, 'Admin File ID'
-        ADMIN_VOICE_REVIEW = 54, 'Admin Voice Review'
+        ADMIN_VOICE_REVIEW = 54, 'Admin Voice Review',
+        ADMIN_BROADCAST_STATUS = 55, 'Admin Broadcast Status',
         USER_MAIN = 19, 'User Main'
         USER_CONTACT_ADMIN = 20, 'User Contact Admin'
         USER_SUGGEST_VOICE_NAME = 21, 'User Suggest Voice Name'
@@ -173,9 +174,9 @@ class Voice(models.Model):
         super().delete(*args, **kwargs)
 
     message_id = models.BigIntegerField(verbose_name='Message ID', null=True, blank=True)
-    file_id = models.CharField(max_length=200, verbose_name='Voice File ID')
-    file_unique_id = models.CharField(max_length=100, verbose_name='Voice Unique ID')
-    name = models.CharField(max_length=200)
+    file_id = models.CharField(max_length=128, verbose_name='Voice File ID')
+    file_unique_id = models.CharField(max_length=64, verbose_name='Voice Unique ID')
+    name = models.CharField(max_length=256)
     sender = models.ForeignKey(User, models.CASCADE, related_name='senders')
     voters = models.ManyToManyField(User, related_name='voters', blank=True)
     votes = models.IntegerField(default=0, verbose_name='Up Votes')
