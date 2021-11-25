@@ -45,7 +45,7 @@ services:
       source: db
       target: /var/lib/mysql
   nginx:
-    image: ghcr.io/sholex-team/nginx:3.6
+    image: ghcr.io/sholex-team/nginx:3.7
     networks:
       - nginx_lilsholex
       - internet
