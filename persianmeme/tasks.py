@@ -1,37 +1,36 @@
-from .models import Voice
+from .models import Meme
 from background_task import background
-from .functions import delete_vote_sync
 from zoneinfo import ZoneInfo
 from datetime import datetime
 from background_task.models import CompletedTask
 
 
-@background(schedule=21600)
-def revoke_review(voice_id: int):
+@background(schedule=3600)
+def revoke_review(meme_id: int):
     try:
-        target_voice = Voice.objects.get(id=voice_id, reviewed=False)
-    except Voice.DoesNotExist:
+        target_meme = Meme.objects.get(id=meme_id, reviewed=False, status=Meme.Status.ACTIVE)
+    except Meme.DoesNotExist:
         return
-    target_voice.assigned_admin = None
-    target_voice.save()
+    target_meme.assigned_admin = None
+    target_meme.save()
 
 
 @background(schedule=21600)
-def check_voice(voice_id: int):
+def check_meme(meme_id: int):
     CompletedTask.objects.all().delete()
-    if datetime.now(ZoneInfo('Asia/Tehran')).hour < 8:
-        return check_voice(voice_id)
     try:
-        voice = Voice.objects.get(id=voice_id, status='p')
-    except Voice.DoesNotExist:
+        meme = Meme.objects.get(id=meme_id, status=Meme.Status.PENDING)
+    except Meme.DoesNotExist:
         return
-    accept_count = voice.accept_vote.count()
-    deny_count = voice.deny_vote.count()
+    if datetime.now(ZoneInfo('Asia/Tehran')).hour < 8:
+        return check_meme(meme_id)
+    accept_count = meme.accept_vote.count()
+    deny_count = meme.deny_vote.count()
     if accept_count == deny_count == 0:
-        return check_voice(voice_id)
+        return check_meme(meme_id)
     else:
-        delete_vote_sync(voice.message_id)
+        meme.delete_vote()
         if accept_count >= deny_count:
-            voice.accept()
+            meme.accept()
         else:
-            voice.deny()
+            meme.deny()

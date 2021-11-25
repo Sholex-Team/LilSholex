@@ -4,3 +4,8 @@ class TooManyRequests(Exception):
 
     def __str__(self):
         return f"Too many requests, retry after {self.retry_after} seconds !"
+
+
+class RequestInterruption(Exception):
+    pass
+

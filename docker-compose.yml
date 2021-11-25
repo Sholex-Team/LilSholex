@@ -45,7 +45,7 @@ services:
       source: db
       target: /var/lib/mysql
   nginx:
-    image: ghcr.io/sholex-team/lilsholex/nginx:3.6
+    image: ghcr.io/sholex-team/nginx:3.6
     networks:
       - nginx_lilsholex
       - internet
@@ -95,11 +95,12 @@ services:
     - "443:443/tcp"
     - "80:80/tcp"
   gunicorn:
-    image: ghcr.io/sholex-team/lilsholex/lilsholex:5.1
+    image: ghcr.io/sholex-team/lilsholex:5.2
     networks:
       - db_django
       - nginx_lilsholex
       - internet
+      - cache_django
     secrets:
       - db_password
       - persianmeme_channel
@@ -108,6 +109,7 @@ services:
       - secret_key
       - persianmeme_logs
       - persianmeme_messages
+      - persianmeme_reports
     depends_on:
       - db
       - migrations
@@ -144,7 +146,7 @@ services:
         source: persianmeme
         target: /home/sholex/persianmeme/migrations
   tasks:
-    image: ghcr.io/sholex-team/lilsholex/lilsholex:5.1
+    image: ghcr.io/sholex-team/lilsholex:5.2
     command: bash -c "python manage.py clear_tasks && python manage.py process_tasks --sleep 15"
     networks:
       - db_django
@@ -157,6 +159,7 @@ services:
       - persianmeme_help_messages
       - persianmeme_logs
       - persianmeme_messages
+      - persianmeme_reports
     depends_on:
       - db
       - migrations
@@ -187,7 +190,7 @@ services:
         source: persianmeme
         target: /home/sholex/persianmeme/migrations
   broadcasts:
-    image: ghcr.io/sholex-team/lilsholex/lilsholex:5.1
+    image: ghcr.io/sholex-team/lilsholex:5.2
     command: "python manage.py process_broadcasts"
     networks:
       - db_django
@@ -200,6 +203,7 @@ services:
       - persianmeme_help_messages
       - persianmeme_logs
       - persianmeme_messages
+      - persianmeme_reports
     depends_on:
       - db
       - migrations
@@ -229,10 +233,39 @@ services:
       - type: volume
         source: persianmeme
         target: /home/sholex/persianmeme/migrations
+  memcached:
+    image: memcached:1.6.12
+    command: "memcached -m 256"
+    networks:
+      - cache_django
+    deploy:
+      replicas: 1
+      placement:
+        preferences:
+          - spread: node.labels.zone
+        constraints:
+          - node.labels.cache==true
+      restart_policy:
+        condition: any
+        max_attempts: 3
+        window: 20s
+        delay: 10s
+      update_config:
+        parallelism: 1
+        delay: 2s
+        failure_action: rollback
+        monitor: 10s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        failure_action: pause
+        monitor: 10s
+        order: start-first
   migrations:
-    image: ghcr.io/sholex-team/lilsholex/lilsholex:5.1
-    command: "bash -c 'yes | python manage.py makemigrations persianmeme && yes | python manage.py migrate &&\
-    python manage.py collectstatic --noinput'"
+    image: ghcr.io/sholex-team/lilsholex:5.2
+    command: "bash -c 'yes | python manage.py makemigrations persianmeme background_task && \
+    yes | python manage.py migrate && python manage.py collectstatic --noinput'"
     secrets:
       - db_password
       - secret_key
@@ -241,6 +274,7 @@ services:
       - persianmeme_help_messages
       - persianmeme_logs
       - persianmeme_messages
+      - persianmeme_reports
     depends_on:
       - db
     networks:
@@ -276,9 +310,14 @@ networks:
   nginx_lilsholex:
     driver: "overlay"
     name: "nginx_lilsholex"
+    internal: true
   internet:
     driver: "overlay"
     name: "internet"
+  cache_django:
+    driver: "overlay"
+    name: "cache_django"
+    internal: true
 volumes:
   db:
     name: "db"
@@ -299,6 +338,8 @@ secrets:
     external: true
   persianmeme_help_messages:
     file: secrets/help_messages.json
+  persianmeme_reports:
+    external: true
   secret_key:
     external: true
   ssl_certificate:

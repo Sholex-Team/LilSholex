@@ -2,9 +2,7 @@ from django.contrib import admin
 from persianmeme import models
 from django.http import HttpResponse, HttpRequest
 from django.core.serializers import serialize
-from persianmeme.functions import delete_vote_sync
-from django.conf import settings
-from random import randint
+from .functions import fake_deny_vote
 change_permission = ('change',)
 
 
@@ -27,23 +25,28 @@ def current_playlist(obj: models.User):
     return obj.current_playlist.name if obj.current_playlist else None
 
 
-def current_voice(obj: models.User):
-    return obj.current_voice.name if obj.current_voice else None
+def current_meme(obj: models.User):
+    return obj.current_meme.name if obj.current_meme else None
 
 
 @admin.display(description='Deny Votes Count')
-def count_deny_votes(obj: models.Voice):
+def count_deny_votes(obj: models.Meme):
     return obj.deny_vote.count()
 
 
 @admin.display(description='Accept Votes Count')
-def count_accept_votes(obj: models.Voice):
+def count_accept_votes(obj: models.Meme):
     return obj.accept_vote.count()
 
 
 @admin.display(description='Tags Count')
-def count_tags(obj: models.Voice):
+def count_tags(obj: models.Meme):
     return obj.tags.count()
+
+
+@admin.display(description='Reporters Count')
+def count_reporters(obj: models.Report):
+    return obj.reporters.count()
 
 
 @admin.register(models.User)
@@ -92,22 +95,26 @@ class User(admin.ModelAdmin):
         'username',
         'menu_mode'
     )
-    list_filter = ('status', 'rank', 'vote', 'started', 'voice_order', 'menu_mode')
+    list_filter = (
+        'status', 'rank', 'vote', 'started', 'meme_ordering', 'menu_mode', 'use_recent_memes', 'search_items'
+    )
     list_per_page = 15
     search_fields = ('user_id', 'chat_id', 'username')
     readonly_fields = ('user_id', 'date', 'last_usage_date')
     actions = (unban_user, full_ban, ban_user, export_json)
     raw_id_fields = (
-        'favorite_voices',
         'last_broadcast',
         'playlists',
         'current_playlist',
-        'current_voice',
+        'current_meme',
         'current_ad',
-        'temp_voice_tags'
+        'temp_meme_tags',
+        'recent_memes'
     )
     fieldsets = (
-        ('Information', {'fields': ('user_id', 'chat_id', 'rank', 'vote', 'username', 'date', 'voice_order')}),
+        ('Information', {'fields': (
+            'user_id', 'chat_id', 'rank', 'vote', 'username', 'date', 'meme_ordering', 'search_items'
+        )}),
         ('Status', {'fields': (
             'menu',
             'status',
@@ -116,100 +123,105 @@ class User(admin.ModelAdmin):
             'last_start',
             'menu_mode',
             'current_playlist',
-            'current_voice',
+            'current_meme',
             'current_ad',
-            'last_broadcast'
+            'last_broadcast',
+            'use_recent_memes',
+            'report_violation_count'
         )}),
-        ('Voices', {'fields': ('favorite_voices', 'playlists')}),
-        ('Temporary Values', {'fields': ('temp_voice_name', 'temp_user_id', 'temp_voice_tags')})
+        ('Memes', {'fields': ('playlists',)}),
+        ('Temporary Values', {'fields': ('temp_meme_name', 'temp_user_id', 'temp_meme_tags')})
     )
 
 
-@admin.register(models.Voice)
-class Voice(admin.ModelAdmin):
+@admin.register(models.Meme)
+class Meme(admin.ModelAdmin):
     @admin.display(description='Accept Votes')
     def accept_vote(self, request: HttpRequest, queryset):
         result = [
-            (target_voice, target_voice.accept(), delete_vote_sync(target_voice.message_id))
-            for target_voice in queryset if target_voice.status == 'p'
+            (target_meme, target_meme.accept(), target_meme.delete_vote())
+            for target_meme in queryset if target_meme.status == 'p'
         ]
         result_len = len(result)
         if result_len == 0:
-            self.message_user(request, 'There is no need to accept these voices !')
+            self.message_user(request, 'There is no need to accept these memes !')
         elif result_len == 1:
-            self.message_user(request, f'{result[0][0]} has been accepted !')
+            self.message_user(request, f'{result[0][0]} meme has been accepted !')
         else:
-            self.message_user(request, f'{result_len} Voices have been accepted !')
+            self.message_user(request, f'{result_len} memes have been accepted !')
 
     @admin.display(description='Deny Vote')
     def deny_vote(self, request: HttpRequest, queryset):
         result = [
-            (target_voice, target_voice.deny(), delete_vote_sync(target_voice.message_id))
-            for target_voice in queryset if target_voice.status == 'p'
+            (target_meme, target_meme.delete_vote(), target_meme.deny())
+            for target_meme in queryset if target_meme.status == 'p'
         ]
         result_len = len(result)
         if result_len == 0:
-            self.message_user(request, 'There is no need to deny these voices !')
+            self.message_user(request, 'There is no need to deny these memes !')
         else:
             queryset.delete()
             if result_len == 1:
                 self.message_user(request, f'{result[0][0]} has been denied !')
             else:
-                self.message_user(request, f'{result_len} Voices have been denied !')
+                self.message_user(request, f'{result_len} memes have been denied !')
 
     @admin.display(description='Add Fake Deny Votes')
     def add_fake_deny_votes(self, request: HttpRequest, queryset):
-        if (user_count := models.User.objects.count()) < settings.MIN_FAKE_VOTE:
-            fake_min = user_count
-            fake_max = user_count
-        else:
-            fake_min = settings.MIN_FAKE_VOTE
-            if user_count < settings.MAX_FAKE_VOTE:
-                fake_max = user_count
-            else:
-                fake_max = settings.MAX_FAKE_VOTE
-        faked_count = 0
-        for voice in queryset:
-            if voice.status == voice.Status.PENDING and \
-                    voice.deny_vote.count() < (random_fake := randint(fake_min, fake_max)):
-                faked_count += 1
-                voice.deny_vote.set(models.User.objects.all()[:random_fake])
-        if faked_count == 0:
+        if (faked_count := fake_deny_vote(queryset)) == 0:
             self.message_user(request, 'There is no need to add fake votes !')
         elif faked_count == 1:
-            self.message_user(request, 'Fake votes have been added to a voice !')
+            self.message_user(request, 'Fake votes have been added to a meme !')
         else:
-            self.message_user(request, f'Fake votes has been added to {faked_count} voices !')
+            self.message_user(request, f'Fake votes has been added to {faked_count} memes !')
     
-    @admin.display(description='Recover Voices')
-    def recover_voices(self, request: HttpRequest, queryset):
-        if not (recovered_voices_count := queryset.filter(status=models.Voice.Status.DELETED).update(
-                status=models.Voice.Status.ACTIVE
+    @admin.display(description='Recover Memes')
+    def recover_memes(self, request: HttpRequest, queryset):
+        if not (recovered_memes_count := queryset.filter(status=models.Meme.Status.DELETED).update(
+                status=models.Meme.Status.ACTIVE
         )):
-            self.message_user(request, 'There isn\'t any voice to recover !')
-        elif recovered_voices_count == 1:
-            self.message_user(request, 'One voice has been recovered.')
+            self.message_user(request, 'There isn\'t any meme to recover !')
+        elif recovered_memes_count == 1:
+            self.message_user(request, 'One meme has been recovered.')
         else:
-            self.message_user(request, f'{recovered_voices_count} Voices have been recovered.')
+            self.message_user(request, f'{recovered_memes_count} memes have been recovered.')
 
     add_fake_deny_votes.allowed_permissions = change_permission
-    recover_voices.allowed_permissions = change_permission
+    recover_memes.allowed_permissions = change_permission
     date_hierarchy = 'date'
     list_display = (
-        'id', 'name', 'sender', 'votes', 'status', 'usage_count', count_deny_votes, count_accept_votes, count_tags
+        'id', 'name', 'sender', 'type', 'status', 'usage_count', count_deny_votes, count_accept_votes, count_tags
     )
-    list_filter = ('status', 'voice_type', 'reviewed')
-    search_fields = ('name', 'sender__chat_id', 'file_id', 'file_unique_id', 'id', 'sender__user_id')
-    actions = (export_json, accept_vote, deny_vote, add_fake_deny_votes, recover_voices)
+    list_filter = ('status', 'visibility', 'reviewed', 'type', 'previous_status')
+    search_fields = ('name', 'sender__chat_id', 'file_id', 'file_unique_id', 'id', 'sender__user_id', 'description')
+    actions = (export_json, accept_vote, deny_vote, add_fake_deny_votes, recover_memes)
     list_per_page = 15
     readonly_fields = ('id', 'date')
     raw_id_fields = ('sender', 'voters', 'accept_vote', 'deny_vote', 'tags', 'assigned_admin')
     fieldsets = (
         ('Information', {'fields': (
-            'id', 'file_id', 'name', 'file_unique_id', 'date', 'sender', 'tags', 'assigned_admin', 'message_id'
+            'id',
+            'file_id',
+            'name',
+            'file_unique_id',
+            'description',
+            'date',
+            'sender',
+            'tags',
+            'assigned_admin',
+            'message_id',
+            'type'
         )}),
         ('Status', {'fields': (
-            'status', 'votes', 'voice_type', 'voters', 'accept_vote', 'deny_vote', 'usage_count', 'reviewed'
+            'status',
+            'votes',
+            'visibility',
+            'voters',
+            'accept_vote',
+            'deny_vote',
+            'usage_count',
+            'reviewed',
+            'previous_status'
         )})
     )
 
@@ -226,13 +238,13 @@ class Ad(admin.ModelAdmin):
 
 @admin.register(models.Delete)
 class Delete(admin.ModelAdmin):
-    list_display = ('delete_id', 'voice', 'user')
-    readonly_fields = ('delete_id',)
+    list_display = ('id', 'meme', 'user')
+    readonly_fields = ('id',)
     search_fields = (
-        'delete_id', 'user__username', 'user__chat_id', 'voice__id', 'voice__file_id', 'voice__file_unique_id'
+        'id', 'user__username', 'user__chat_id', 'meme__id', 'meme__file_id', 'meme__file_unique_id'
     )
-    raw_id_fields = ('voice', 'user')
-    fieldsets = (('Information', {'fields': ('delete_id', 'voice', 'user')}),)
+    raw_id_fields = ('meme', 'user')
+    fieldsets = (('Information', {'fields': ('id', 'meme', 'user')}),)
 
 
 @admin.register(models.Broadcast)
@@ -269,27 +281,45 @@ class Message(admin.ModelAdmin):
     fieldsets = (('Information', {'fields': ('id', 'sender')}), ('Status', {'fields': ('status',)}))
 
 
-@admin.register(models.VoiceTag)
-class VoiceTag(admin.ModelAdmin):
+@admin.register(models.MemeTag)
+class MemeTa(admin.ModelAdmin):
     list_display = ('tag',)
     search_fields = ('tag',)
     list_per_page = 30
     fieldsets = (('Information', {'fields': ('tag',)}),)
 
 
-@admin.register(models.RecentVoice)
-class RecentVoice(admin.ModelAdmin):
-    raw_id_fields = ('user', 'voice')
+@admin.register(models.RecentMeme)
+class RecentMemes(admin.ModelAdmin):
+    raw_id_fields = ('user', 'meme')
     readonly_fields = ('id',)
-    list_display = ('id', 'user', 'voice')
+    list_display = ('id', 'user', 'meme')
     list_per_page = 30
     search_fields = (
         'id',
         'user__username',
         'user__chat_id',
         'user__user_id',
-        'voice__id',
-        'voice__file_unique_id',
-        'voice__file_id'
+        'meme__id',
+        'meme__file_unique_id',
+        'meme__file_id'
     )
-    fieldsets = (('Information', {'fields': ('id', 'user', 'voice')}),)
+    fieldsets = (('Information', {'fields': ('id', 'user', 'meme')}),)
+
+
+@admin.register(models.Report)
+class Report(admin.ModelAdmin):
+    list_display = ('meme', count_reporters, 'status')
+    list_filter = ('status',)
+    list_per_page = 20
+    search_fields = (
+        'reporters__user_id',
+        'reporters__chat_id',
+        'reporters__username',
+        'meme__id',
+        'meme__name',
+        'meme__file_id',
+        'meme__unique_file_id'
+    )
+    raw_id_fields = ('meme', 'reporters')
+    fieldsets = (('Information', {'fields': ('meme', 'reporters')}), ('Status', {'fields': ('status',)}))

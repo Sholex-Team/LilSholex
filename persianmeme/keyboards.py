@@ -1,25 +1,35 @@
 from .types import ObjectType
 from LilSholex.functions import emoji_number
-owner = {'keyboard': [
-    ['Add Sound', 'Delete Sound', 'Voice Count', 'Member Count'],
+admin = {'keyboard': [
+    ['Add Meme', 'Delete Meme', 'Meme Count'],
     ['Ban a User', 'Unban a User', 'Full Ban'],
     ['Broadcast', 'Message User'],
-    ['Get Voice', 'Get User', 'Started Count'],
+    ['Get User', 'Started Count'],
     ['Add Ad', 'Delete Ad', 'Edit Ad'],
-    ['Accept Voice', 'Ban Vote', 'Deny Voice'],
-    ['Edit Voice', 'File ID', 'Voice Review'],
+    ['Accept Meme', 'Ban Vote', 'Deny Meme'],
+    ['Edit Meme', 'File ID', 'Meme Review'],
     ['Messages', 'Delete Requests'],
-    ['Broadcast Status']
+    ['Broadcast Status', 'Member Count']
+], 'resize_keyboard': True}
+en_meme_type = {'keyboard': [['Video', 'Voice'], ['Back 🔙']], 'resize_keyboard': True}
+per_meme_type = {'keyboard': [['ویس 🔊', 'ویدئو 📹'], ['بازگشت 🔙']], 'resize_keyboard': True}
+search_items = {'keyboard': [
+    ['ویس ها 🔊', 'ویدئو ها 📹'], ['ویس ها 🔊 و ویدئو ها 📹'], ['بازگشت 🔙']
 ], 'resize_keyboard': True}
 user = {'keyboard': [
-    ['راهنما 🔰'],
+    ['راهنما 🔰', 'گزارش تخلف 🛑'],
     ['گروه عمومی', 'دیسکورد', 'حمایت مالی 💸'],
-    ['ویس های پیشنهادی ✔', 'لغو رای گیری ⏹'],
-    ['درخواست حذف ویس ✖', 'ویس های شخصی 🔒'],
-    ['پر استفاده ها ⭐', 'ویس های محبوب 👌'],
-    ['علاقه مندی ها ❤️', 'پلی لیست ▶️'],
+    ['ویس ها 🔊', 'ویدئو ها 📹'],
+    ['پر استفاده ها ⭐', 'میم های محبوب 👌'],
+    ['آخرین میم ها 🆕'],
     ['ارتباط با مدیریت 📬', 'تنظیمات ⚙'],
-    ['آخرین ویس ها 🆕', ]
+    ['درخواست حذف میم ✖']
+], 'resize_keyboard': True}
+manage_voices = {'keyboard': [
+    ['ویس های پیشنهادی ✔', 'ویس های شخصی 🔒'], ['پلی لیست ها ▶️'], ['بازگشت 🔙']
+], 'resize_keyboard': True}
+video_suggestions = {'keyboard': [
+    ['پیشنهاد ویدئو 🔥', 'مشاهده ی ویدئو ها 📝'], ['لغو رای گیری ⏹'], ['بازگشت 🔙']
 ], 'resize_keyboard': True}
 per_back = {'keyboard': [['بازگشت 🔙']], 'resize_keyboard': True}
 en_back = {'keyboard': [['Back 🔙']], 'resize_keyboard': True}
@@ -32,12 +42,14 @@ voice_order = {'keyboard': [
     ['بازگشت 🔙']
 ], 'resize_keyboard': True}
 settings = {'keyboard': [
-    ['مرتب سازی 🗂', 'امتیازدهی ⭐'],
-    ['ویس های اخیر ⏱'],
+    ['مرتب سازی 🗂', 'ویس های اخیر ⏱'],
+    ['آیتم های جستجو 🔍', 'امتیازدهی ⭐'],
     ['بازگشت 🔙']
 ], 'resize_keyboard': True}
 manage_voice_list = {'keyboard': [['افزودن ویس ⏬', 'مشاهده ی ویس ها 📝'], ['بازگشت 🔙']], 'resize_keyboard': True}
-manage_suggestions = {'keyboard': [['پیشنهاد ویس 🔥', 'مشاهده ی ویس ها 📝'], ['بازگشت 🔙']], 'resize_keyboard': True}
+voice_suggestions = {'keyboard': [
+    ['پیشنهاد ویس 🔥', 'مشاهده ی ویس ها 📝'], ['لغو رای گیری ⏹'], ['بازگشت 🔙']
+], 'resize_keyboard': True}
 discord = {'inline_keyboard': [[{'text': 'Discord 🎮', 'url': 'https://discord.gg/u8aAzG3SAf'}]]}
 group = {'inline_keyboard': [[{'text': 'گروه عمومی 👥', 'url': 'https://t.me/persianmemeofficial'}]]}
 admin_message = {'inline_keyboard': [[{'text': 'پیام از طرف مدیریت 👆', 'callback_data': 'none'}]]}
@@ -51,36 +63,50 @@ manage_playlist = {'keyboard': [
     ['بازگشت 🔙']
 ], 'resize_keyboard': True}
 manage_voice = {'keyboard': [['حذف ویس ❌', 'گوش دادن به ویس 🎧'], ['بازگشت 🔙']], 'resize_keyboard': True}
-edit_voice = {'keyboard': [['Edit Name', 'Edit Tags'], ['Done ✔'], ['Back 🔙']], 'resize_keyboard': True}
-voice_review = {'keyboard': [
-    ['Edit Name', 'Edit Tags'], ['Delete 🗑', 'Check the Voice'], ['Done ✔', 'Done and Next ⏭'], ['Back 🔙']
+manage_video = {'keyboard': [['حذف ویدئو ❌', 'تماشای ویدئو 👁'], ['بازگشت 🔙']], 'resize_keyboard': True}
+edit_meme = {'keyboard': [
+    ['Edit Name', 'Edit Tags', 'Check the Meme'],
+    ['Edit Tags & Description'],
+    ['Edit Description'],
+    ['Done ✔'],
+    ['Back 🔙']
+], 'resize_keyboard': True}
+meme_review = {'keyboard': [
+    ['Edit Name', 'Edit Tags'],
+    ['Edit Tags & Description'],
+    ['Edit Description'],
+    ['Delete 🗑', 'Check the Meme'],
+    ['Done ✔', 'Done and Next ⏭'], ['Back 🔙']
 ], 'resize_keyboard': True}
 deleted = {'inline_keyboard': [[{'text': 'Deleted 🗑', 'callback_data': 'none'}]]}
 recovered = {'inline_keyboard': [[{'text': 'Recovered ♻', 'callback_data': 'none'}]]}
+dismissed = {'inline_keyboard': [[{'text': 'Dismissed ✔', 'callback_data': 'none'}]]}
 
 
-def suggestion_vote(voice_id: int):
+def suggestion_vote(meme_id: int):
     return {'inline_keyboard': [[
-        {'text': '✅', 'callback_data': f'a:{voice_id}'},
-        {'text': 'نتایج 📊', 'callback_data': f're:{voice_id}'},
-        {'text': '❌', 'callback_data': f'd:{voice_id}'}
+        {'text': '✅', 'callback_data': f'a:{meme_id}'},
+        {'text': '❌', 'callback_data': f'd:{meme_id}'}
+    ], [
+        {'text': 'نتایج 📊', 'callback_data': f're:{meme_id}'},
+        {'text': 'گزارش ⚠', 'callback_data': f'rep:{meme_id}'}
     ]]}
 
 
-def voice_recovery(voice_id: int):
+def meme_recovery(meme_id: int):
     return {'inline_keyboard': [[
-        {'text': 'Recover', 'callback_data': f'r:{voice_id}'},
-        {'text': 'Delete', 'callback_data': f'rd:{voice_id}'}
+        {'text': 'Recover', 'callback_data': f'r:{meme_id}'},
+        {'text': 'Delete', 'callback_data': f'rd:{meme_id}'}
     ]]}
 
 
 def message(chat_id):
-    return {'inline_keyboard': [[{'text': f'From : {chat_id}', 'callback_data': 'none'}]]}
+    return {'inline_keyboard': [[{'text': f'From : {chat_id}', 'callback_data': f'p:{chat_id}'}]]}
 
 
 def manage_message(target_message):
     return {'inline_keyboard': [
-        [{'text': f'From : {target_message.sender.chat_id}', 'callback_data': 'none'}],
+        [{'text': f'From : {target_message.sender.chat_id}', 'callback_data': f'p:{target_message.sender.chat_id}'}],
         [
             {'text': 'Read', 'callback_data': f'read:{target_message.id}'},
             {'text': 'Ban', 'callback_data': f'ban:{target_message.id}'}
@@ -90,14 +116,14 @@ def manage_message(target_message):
 
 
 def delete_voice(delete_id):
-    return {'inline_keyboard': [
-        [{'text': 'Delete', 'callback_data': f'delete:{delete_id}'},
-         {'text': 'Deny', 'callback_data': f'delete_deny:{delete_id}'}]
-    ]}
+    return {'inline_keyboard': [[
+        {'text': 'Delete', 'callback_data': f'delete:{delete_id}'},
+        {'text': 'Deny', 'callback_data': f'delete_deny:{delete_id}'}
+    ]]}
 
 
-def use(voice_id: int):
-    return {'inline_keyboard': [[{'text': 'استفاده ✔️', 'switch_inline_query': f'id:{voice_id}'}]]}
+def use(meme_id: int):
+    return {'inline_keyboard': [[{'text': 'استفاده ✔️', 'switch_inline_query': f'id:{meme_id}'}]]}
 
 
 def create_voice_list_keyboard(voices, start: int):
@@ -114,7 +140,7 @@ def create_list_keyboard(objs: tuple, object_type: ObjectType, start: int):
     } for index, obj in enumerate(objs)]
 
 
-def make_voice_list(voices):
+def make_meme_list(voices):
     return {'inline_keyboard': [
         create_voice_list_keyboard(
             voices[start:index], start
@@ -146,3 +172,10 @@ def help_keyboard(messages):
     temp_keyboard = {'keyboard': [messages[i:i + 2] for i in range(0, len(messages), 2)], 'resize_keyboard': True}
     temp_keyboard['keyboard'].insert(0, per_back['keyboard'][0])
     return temp_keyboard
+
+
+def report(meme_id: int):
+    return {'inline_keyboard': [[
+        {'text': 'Delete', 'callback_data': f'rep_accept:{meme_id}'},
+        {'text': 'Dismiss', 'callback_data': f'rep_dismiss:{meme_id}'}
+    ]]}

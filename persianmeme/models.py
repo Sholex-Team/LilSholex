@@ -3,19 +3,25 @@ import requests
 from django.conf import settings
 from django.db import models
 from LilSholex.decorators import sync_fix
-from .keyboards import voice_recovery
+from .keyboards import meme_recovery, suggestion_vote
 from asgiref.sync import sync_to_async
 from uuid import uuid4
 from . import translations
+from functools import cached_property
 from LilSholex.exceptions import TooManyRequests
 
 
-class VoiceTag(models.Model):
-    tag = models.CharField(max_length=32, verbose_name='Tag Content', primary_key=True)
+class MemeType(models.IntegerChoices):
+    VOICE = 0, 'Voice'
+    VIDEO = 1, 'Video'
+
+
+class MemeTag(models.Model):
+    tag = models.CharField(max_length=20, verbose_name='Tag Content', primary_key=True)
 
     class Meta:
         ordering = ['tag']
-        db_table = 'persianmeme_voice_tags'
+        db_table = 'persianmeme_meme_tags'
 
 
 class User(models.Model):
@@ -30,11 +36,11 @@ class User(models.Model):
         ADMIN = 'a', 'Admin'
         KHIAR = 'k', 'Khiar'
 
-    class VoiceOrder(models.TextChoices):
+    class Ordering(models.TextChoices):
         votes = 'votes', 'Votes (Low to High)'
-        voice_id = 'id', 'Voice ID (Old to New)'
+        meme_id = 'id', 'Meme ID (Old to New)'
         high_votes = '-votes', 'Votes (High to Low)'
-        new_voice_id = '-id', 'Voice ID (New to Old)'
+        new_meme_id = '-id', 'Meme ID (New to Old)'
         high_usage = '-usage_count', 'Usage Count (High to Low)'
         low_usage = 'usage_count', 'Usage Count (Low to High)'
 
@@ -42,11 +48,16 @@ class User(models.Model):
         ADMIN = 'a', 'Admin'
         USER = 'u', 'User'
 
+    class SearchItems(models.IntegerChoices):
+        VOICES = 0, 'Voices'
+        VIDEOS = 1, 'Videos'
+        BOTH = 2, 'Voices & Videos'
+
     class Menu(models.IntegerChoices):
         ADMIN_MAIN = 1, 'Admin Main Menu'
-        ADMIN_VOICE_NAME = 2, 'Admin Voice Name',
-        ADMIN_NEW_VOICE = 3, 'Admin New Voice'
-        ADMIN_DELETE_VOICE = 4, 'Admin Delete Voice'
+        ADMIN_MEME_NAME = 2, 'Admin Meme Name',
+        ADMIN_NEW_MEME = 3, 'Admin New Meme'
+        ADMIN_DELETE_MEME = 4, 'Admin Delete Meme'
         ADMIN_BAN_USER = 5, 'Admin Ban User'
         ADMIN_UNBAN_USER = 6, 'Admin Unban User'
         ADMIN_FULL_BAN_USER = 7, 'Admin Full Ban User'
@@ -59,21 +70,24 @@ class User(models.Model):
         ADMIN_EDIT_AD_ID = 14, 'Admin Edit Ad ID'
         ADMIN_EDIT_AD = 15, 'Admin Edit Ad'
         ADMIN_BAN_VOTE = 16, 'Admin Ban Vote'
-        ADMIN_DENY_VOICE = 17, 'Admin Deny Voice'
-        ADMIN_ACCEPT_VOICE = 18, 'Admin Accept Voice'
-        ADMIN_GET_VOICE = 40, 'Admin Get Voice'
-        ADMIN_VOICE_TAGS = 42, 'Admin Voice Tags',
-        ADMIN_SEND_EDIT_VOICE = 44, 'Admin Send Edit Voice',
-        ADMIN_EDIT_VOICE = 45, 'Admin Edit Voice',
-        ADMIN_EDIT_VOICE_NAME = 46, 'Admin Edit Voice Name',
-        ADMIN_EDIT_VOICE_TAGS = 47, 'Admin Edit Voice Tags',
+        ADMIN_DENY_MEME = 17, 'Admin Deny Meme'
+        ADMIN_ACCEPT_MEME = 18, 'Admin Accept Meme'
+        ADMIN_GET_MEME = 40, 'Admin Get Meme'
+        ADMIN_MEME_TAGS = 42, 'Admin Meme Tags'
+        ADMIN_SEND_EDIT_MEME = 44, 'Admin Send Edit Meme'
+        ADMIN_EDIT_MEME = 45, 'Admin Edit Meme'
+        ADMIN_EDIT_MEME_NAME = 46, 'Admin Edit Meme Name'
+        ADMIN_EDIT_MEME_TAGS = 47, 'Admin Edit Meme Tags'
         ADMIN_FILE_ID = 48, 'Admin File ID'
-        ADMIN_VOICE_REVIEW = 54, 'Admin Voice Review',
-        ADMIN_BROADCAST_STATUS = 55, 'Admin Broadcast Status',
+        ADMIN_MEME_REVIEW = 54, 'Admin Meme Review'
+        ADMIN_BROADCAST_STATUS = 55, 'Admin Broadcast Status'
+        ADMIN_MEME_TYPE = 57, 'Admin Meme Type'
+        ADMIN_EDIT_MEME_TAGS_AND_DESCRIPTION = 62, 'Admin Edit Meme Tags and Description'
+        ADMIN_EDIT_MEME_DESCRIPTION = 63, 'Admin Edit Meme Description'
         USER_MAIN = 19, 'User Main'
         USER_CONTACT_ADMIN = 20, 'User Contact Admin'
-        USER_SUGGEST_VOICE_NAME = 21, 'User Suggest Voice Name'
-        USER_SUGGEST_VOICE = 22, 'User Suggest Voice'
+        USER_SUGGEST_MEME_NAME = 21, 'User Suggest Meme Name'
+        USER_SUGGEST_MEME = 22, 'User Suggest Meme'
         USER_RANKING = 24, 'User Ranking'
         USER_SORTING = 25, 'User Sorting'
         USER_DELETE_REQUEST = 26, 'User Delete Request'
@@ -81,21 +95,24 @@ class User(models.Model):
         USER_PRIVATE_VOICE_NAME = 28, 'User Private Voice Name'
         USER_MANAGE_PRIVATE_VOICE = 29, 'User Manage Private Voice'
         USER_PRIVATE_VOICE = 30, 'User Private Voice'
-        USER_FAVORITE_VOICES = 31, 'User Favorite Voices'
-        USER_FAVORITE_VOICE = 32, 'User Favorite Voice'
-        USER_MANAGE_FAVORITE_VOICE = 33, 'User Manage Favorite Voice'
         USER_PLAYLISTS = 35, 'User Playlists'
         USER_CREATE_PLAYLIST = 36, 'User Create Playlist'
         USER_MANAGE_PLAYLIST = 37, 'User Manage Playlist'
         USER_ADD_VOICE_PLAYLIST = 38, 'User Add Voice To Playlist'
         USER_MANAGE_PLAYLIST_VOICE = 39, 'User Manager Playlist Voice'
-        USER_SUGGEST_VOICE_TAGS = 41, 'User Suggest Voice Tags'
+        USER_SUGGEST_MEME_TAGS = 41, 'User Suggest Meme Tags'
         USER_PRIVATE_VOICE_TAGS = 43, 'User Private Voice Tags'
         USER_HELP = 49, 'User Help'
         USER_SETTINGS = 50, 'User Settings'
         USER_RECENT_VOICES = 51, 'User Recent Voices'
-        USER_SUGGESTIONS = 52, 'User Suggestions'
-        USER_MANAGE_SUGGESTION = 53, 'User Manage Suggestion'
+        USER_VOICE_SUGGESTIONS = 52, 'User Voice Suggestions'
+        USER_MANAGE_VOICE_SUGGESTION = 53, 'User Manage Voice Suggestion'
+        USER_VIDEO_SUGGESTIONS = 60, 'User Video Suggestions'
+        USER_MANAGE_VOICES = 56, 'User Manage Voices'
+        USER_MANAGE_VIDEO_SUGGESTION = 61, 'User Manager Video Suggestion'
+        USER_SUGGEST_MEME_TYPE = 58, 'User Suggest Meme Type'
+        USER_REPORT_MEME = 59, 'User Report Meme'
+        USER_SEARCH_ITEMS = 64, 'User Search Items'
 
     user_id = models.AutoField(verbose_name='User ID', primary_key=True, unique=True)
     chat_id = models.BigIntegerField(verbose_name='Chat ID', unique=True)
@@ -103,16 +120,15 @@ class User(models.Model):
     status = models.CharField(max_length=1, choices=Status.choices, default=Status.ACTIVE)
     rank = models.CharField(max_length=1, choices=Rank.choices, default=Rank.USER)
     username = models.CharField(max_length=35, null=True, blank=True)
-    temp_voice_name = models.CharField(max_length=50, null=True, verbose_name='Temporary Voice Name', blank=True)
+    temp_meme_name = models.CharField(max_length=50, null=True, verbose_name='Temporary Meme Name', blank=True)
     temp_user_id = models.BigIntegerField(null=True, verbose_name='Temporary User ID', blank=True)
-    temp_voice_tags = models.ManyToManyField(
-        VoiceTag, 'user_voice_tags', blank=True, verbose_name='Temporary Voice Tags'
+    temp_meme_tags = models.ManyToManyField(
+        MemeTag, 'user_voice_tags', blank=True, verbose_name='Temporary Voice Tags'
     )
     last_usage_date = models.DateTimeField(auto_now=True)
     vote = models.BooleanField(verbose_name='Vote System', default=False)
     date = models.DateTimeField(verbose_name='Register Date', auto_now_add=True)
-    voice_order = models.CharField(max_length=12, choices=VoiceOrder.choices, default=VoiceOrder.new_voice_id)
-    favorite_voices = models.ManyToManyField('Voice', 'favorite_voices', blank=True)
+    meme_ordering = models.CharField(max_length=12, choices=Ordering.choices, default=Ordering.new_meme_id)
     back_menu = models.CharField(max_length=50, null=True, blank=True)
     started = models.BooleanField('Started', default=False)
     last_start = models.DateTimeField(null=True, blank=True)
@@ -126,15 +142,20 @@ class User(models.Model):
         verbose_name='Current Playlist',
         default=None
     )
-    current_voice = models.ForeignKey('Voice', models.SET_NULL, 'user_voice', blank=True, null=True, default=None)
+    current_meme = models.ForeignKey('Meme', models.SET_NULL, 'user_voice', blank=True, null=True, default=None)
     current_ad = models.ForeignKey('Ad', models.SET_NULL, 'user_ad', null=True, blank=True)
     menu_mode = models.CharField(
         max_length=1, verbose_name='Menu Mode', choices=MenuMode.choices, default=MenuMode.USER
     )
-    recent_voices = models.ManyToManyField(
-        'Voice', 'recent_voices', blank=True, verbose_name='Recent Voices', through='RecentVoice'
+    recent_memes = models.ManyToManyField(
+        'Meme', 'recent_memes', blank=True, verbose_name='Recent Memes', through='RecentMeme'
     )
-    use_recent_voices = models.BooleanField('Use Recent Voices', default=True)
+    use_recent_memes = models.BooleanField('Use Recent Memes', default=True)
+    temp_meme_type = models.PositiveSmallIntegerField(
+        'Temporary Meme Type', blank=True, null=True, choices=MemeType.choices
+    )
+    report_violation_count = models.PositiveSmallIntegerField(default=0)
+    search_items = models.PositiveSmallIntegerField(choices=SearchItems.choices, default=SearchItems.BOTH)
 
     class Meta:
         db_table = 'persianmeme_users'
@@ -144,110 +165,97 @@ class User(models.Model):
         return f'{self.chat_id}:{self.rank}'
 
 
-class Voice(models.Model):
+class Meme(models.Model):
     class Status(models.TextChoices):
         ACTIVE = 'a', 'Active'
         PENDING = 'p', 'Pending'
         DELETED = 'd', 'Deleted'
+        REPORTED = 'r', 'Reported'
 
-    class Type(models.TextChoices):
+    class Visibility(models.TextChoices):
         NORMAL = 'n', 'Normal'
         PRIVATE = 'p', 'Private'
 
-    def ban_sender(self):
-        self.sender.status = self.sender.Status.BANNED
-        self.sender.save()
-        self.deny()
-
-    def delete(self, *args, **kwargs):
-        if kwargs.get('log'):
-            self.send_voice(
-                settings.MEME_LOGS,
-                kwargs.get('http_session', requests.Session()),
-                voice_recovery(self.id),
-                translations.admin_messages['deleted_by_admins'].format(
-                    f' by {kwargs.pop("admin")}' if kwargs.get('admin') else '', self.file_id
-                )
-            )
-            self.status = self.Status.DELETED
-            return self.save()
-        super().delete(*args, **kwargs)
-
     message_id = models.BigIntegerField(verbose_name='Message ID', null=True, blank=True)
-    file_id = models.CharField(max_length=128, verbose_name='Voice File ID')
-    file_unique_id = models.CharField(max_length=64, verbose_name='Voice Unique ID')
+    file_id = models.CharField(max_length=128, verbose_name='Meme File ID')
+    file_unique_id = models.CharField(max_length=64, verbose_name='Meme Unique ID')
     name = models.CharField(max_length=256)
     sender = models.ForeignKey(User, models.CASCADE, related_name='senders')
     voters = models.ManyToManyField(User, related_name='voters', blank=True)
     votes = models.IntegerField(default=0, verbose_name='Up Votes')
     status = models.CharField(max_length=1, choices=Status.choices)
+    previous_status = models.CharField(
+        max_length=1, choices=Status.choices, null=True, blank=True, verbose_name='Status Before Reporting'
+    )
     date = models.DateTimeField(auto_now_add=True, verbose_name='Register Date')
-    voice_type = models.CharField(max_length=1, choices=Type.choices, default=Type.NORMAL)
+    visibility = models.CharField(max_length=1, choices=Visibility.choices, default=Visibility.NORMAL)
     accept_vote = models.ManyToManyField(User, 'accept_vote_users', blank=True, verbose_name='Accept Votes')
     deny_vote = models.ManyToManyField(User, 'deny_vote_users', blank=True, verbose_name='Deny Votes')
-    tags = models.ManyToManyField(VoiceTag, 'voice_tags', blank=True)
+    tags = models.ManyToManyField(MemeTag, 'meme_tags', blank=True)
     usage_count = models.PositiveIntegerField('Usage Count', default=0)
     assigned_admin = models.ForeignKey(
-        User, models.SET_NULL, 'voice_admin', verbose_name='Assigned Admin', null=True, blank=True
+        User, models.SET_NULL, 'meme_admin', verbose_name='Assigned Admin', null=True, blank=True
     )
     reviewed = models.BooleanField('Is Reviewed', default=False)
+    type = models.PositiveSmallIntegerField('Meme Type', choices=MemeType.choices, default=MemeType.VOICE)
+    description = models.CharField(max_length=120, blank=True, null=True)
 
     class Meta:
-        db_table = 'persianmeme_voices'
+        db_table = 'persianmeme_memes'
         ordering = ['-id']
 
     def __str__(self):
         return f'{self.name}:{self.file_id}'
 
-    def user_accept(self):
-        self.status = self.Status.ACTIVE
-        self.save()
-        self.accept_vote.clear()
-        self.deny_vote.clear()
-        return self.sender
-
-    def user_deny(self):
-        sender = self.sender
-        self.delete()
-        return sender
-
-    def accept(self):
+    def accept(self, session: requests.Session = requests.Session()):
         from .functions import send_message
         self.status = self.Status.ACTIVE
         self.save()
         self.accept_vote.clear()
         self.deny_vote.clear()
-        send_message(self.sender.chat_id, translations.user_messages['voice_accepted'])
-        for admin in User.objects.filter(rank=User.Rank.ADMIN):
-            send_message(admin.chat_id, translations.admin_messages['review_required'])
+        send_message(self.sender.chat_id, translations.user_messages['meme_accepted'].format(
+            translations.user_messages[self.type_string]
+        ), session)
 
-    def deny(self):
+    def deny(self, session: requests.Session = requests.Session()):
         from .functions import send_message
-        send_message(self.sender.chat_id, translations.user_messages['voice_denied'])
+        send_message(self.sender.chat_id, translations.user_messages['meme_denied'].format(
+            translations.user_messages[self.type_string]
+        ), session)
         self.delete()
+
+    @property
+    def description_text(self):
+        return translations.admin_messages['description'].format(self.description) \
+            if self.type == MemeType.VIDEO else str()
 
     @sync_fix
-    def send_voice(
+    def send_meme(
             self,
             chat_id: int,
             session: requests.Session = requests.Session(),
-            voice_keyboard: dict = None,
+            meme_keyboard: dict = None,
             extra_text: str = ''
     ) -> int:
         tags_string = str()
         for tag in self.tags.all():
             tags_string += f'\n<code>{tag.tag}</code>'
-        voice_dict = {
-            'caption': f'{extra_text}<b>Voice Name</b>: <code>{self.name}</code>\n\n<b>Voice Tags 👇</b>{tags_string}',
+        meme_dict = {
+            'caption': f'{extra_text}<b>Meme Name</b>: <code>{self.name}</code>\n\n<b>Meme Tags 👇</b>{tags_string}',
             'parse_mode': 'HTML',
-            'voice': self.file_id,
             'chat_id': chat_id
         }
-        if voice_keyboard:
-            voice_dict['reply_markup'] = json.dumps(voice_keyboard)
+        if meme_keyboard:
+            meme_dict['reply_markup'] = json.dumps(meme_keyboard)
+        if self.type == MemeType.VOICE:
+            meme_dict['voice'] = self.file_id
+            request_type = 'Voice'
+        else:
+            meme_dict['video'] = self.file_id
+            request_type = 'Video'
         with session.get(
-                f'https://api.telegram.org/bot{settings.MEME}/sendVoice',
-                params=voice_dict,
+                f'https://api.telegram.org/bot{settings.MEME}/send{request_type}',
+                params=meme_dict,
                 timeout=settings.REQUESTS_TIMEOUT * 10
         ) as response:
             if response.status_code == 200:
@@ -255,6 +263,54 @@ class Voice(models.Model):
             elif response.status_code != 429:
                 return 0
             raise TooManyRequests(response.json()['parameters']['retry_after'])
+
+    @cached_property
+    def type_string(self):
+        return 'video' if self.type == MemeType.VIDEO else 'voice'
+
+    def ban_sender(self, session: requests.Session = requests.Session()):
+        self.sender.status = self.sender.Status.BANNED
+        self.sender.save()
+        self.deny(session)
+
+    def delete(self, *args, **kwargs):
+        if kwargs.get('log'):
+            self.send_meme(
+                settings.MEME_LOGS,
+                kwargs.get('http_session', requests.Session()),
+                meme_recovery(self.id),
+                translations.admin_messages['deleted_by_admins'].format(
+                    translations.admin_messages[self.type_string],
+                    kwargs.pop("admin") if kwargs.get('admin') else '',
+                    self.file_id
+                )
+            )
+            self.status = self.Status.DELETED
+            return self.save()
+        super().delete(*args, **kwargs)
+
+    @sync_fix
+    def delete_vote(self, session: requests.Session = requests.Session()):
+        from background_task.models import Task
+
+        Task.objects.filter(task_name='persianmeme.tasks.check_meme', task_params=f'[[{self.id}], ''{}]').delete()
+        with session.get(
+                f'https://api.telegram.org/bot{settings.MEME}/deleteMessage',
+                params={'chat_id': settings.MEME_CHANNEL, 'message_id': self.message_id},
+                timeout=settings.REQUESTS_TIMEOUT
+        ):
+            return
+
+    def send_vote(self, session: requests.Session = requests.Session()):
+        from persianmeme.tasks import check_meme
+
+        self.message_id = self.send_meme(
+            settings.MEME_CHANNEL,
+            session,
+            suggestion_vote(self.id)
+        )
+        self.save()
+        check_meme(self.id)
 
 
 class Ad(models.Model):
@@ -272,16 +328,14 @@ class Ad(models.Model):
 
 
 class Delete(models.Model):
-    delete_id = models.AutoField(primary_key=True, verbose_name='Delete ID')
-    voice = models.ForeignKey(Voice, models.CASCADE, 'deletes_voice')
-    user = models.ForeignKey(User, models.CASCADE, 'deletes_user')
+    meme = models.ForeignKey(Meme, models.CASCADE, 'delete_meme')
+    user = models.ForeignKey(User, models.CASCADE, 'delete_user')
 
     class Meta:
         db_table = 'persianmeme_deletes'
-        ordering = ['delete_id']
 
     def __str__(self):
-        return f'{self.delete_id} : {self.voice.id}'
+        return f'{self.id} : {self.meme.id}'
 
 
 class Broadcast(models.Model):
@@ -305,7 +359,7 @@ class Broadcast(models.Model):
 class Playlist(models.Model):
     invite_link = models.UUIDField('Invite ID', default=uuid4)
     name = models.CharField(max_length=60)
-    voices = models.ManyToManyField(Voice, 'playlist_voice')
+    voices = models.ManyToManyField(Meme, 'playlist_voice')
     creator = models.ForeignKey(User, models.CASCADE)
     date = models.DateTimeField('Creation Date', auto_now_add=True)
 
@@ -336,13 +390,30 @@ class Message(models.Model):
         return f'{self.id} : {self.sender.chat_id}'
 
 
-class RecentVoice(models.Model):
-    user = models.ForeignKey(User, models.CASCADE, 'recent_voice_user')
-    voice = models.ForeignKey(Voice, models.CASCADE, 'recent_voice_voice')
+class RecentMeme(models.Model):
+    user = models.ForeignKey(User, models.CASCADE, 'recent_meme_user')
+    meme = models.ForeignKey(Meme, models.CASCADE, 'recent_meme_meme')
 
     class Meta:
         ordering = ['-id']
-        db_table = 'persianmeme_user_recent_voices'
+        db_table = 'persianmeme_user_recent_memes'
+
+
+class Report(models.Model):
+    class Status(models.IntegerChoices):
+        PENDING = 0, 'Pending'
+        REVIEWED = 1, 'Reviewed'
+
+    meme = models.OneToOneField(
+        Meme, models.CASCADE, related_name='report_meme', verbose_name='Reported Meme', primary_key=True
+    )
+    reporters = models.ManyToManyField(User, 'report_users', blank=False)
+    status = models.PositiveSmallIntegerField(choices=Status.choices, default=Status.PENDING)
+    report_date = models.DateTimeField(auto_now_add=True)
+    review_date = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'persianmeme_reports'
 
 
 BOT_ADMINS = (User.Rank.ADMIN, User.Rank.OWNER)

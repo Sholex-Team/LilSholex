@@ -21,7 +21,7 @@ class Base(ABC):
     ):
         self.token = token
         self.chat_id = chat_id
-        self._session = session
+        self.session = session
         self._instance = instance
         if not self.chat_id:
             assert self._instance, 'Instance must be passed when chat id isn\'t !'
@@ -45,7 +45,7 @@ class Base(ABC):
     ) -> int:
         if reply_markup:
             reply_markup = json.dumps(reply_markup)
-        with self._session.get(
+        with self.session.get(
             f'{self._BASE_URL}sendMessage',
             params={
                 **self._BASE_PARAM,
@@ -66,7 +66,7 @@ class Base(ABC):
 
     @sync_fix
     def delete_message(self, message_id: int) -> None:
-        with self._session.get(
+        with self.session.get(
             f'{self._BASE_URL}deleteMessage',
             params={**self._BASE_PARAM, 'message_id': message_id},
             timeout=settings.REQUESTS_TIMEOUT
@@ -79,7 +79,7 @@ class Base(ABC):
     def edit_message_text(self, message_id: int, text: str, inline_keyboard: dict = str()):
         if inline_keyboard:
             inline_keyboard = json.dumps(inline_keyboard)
-        with self._session.get(
+        with self.session.get(
             f'{self._BASE_URL}editMessageText',
             params={**self._BASE_PARAM, 'message_id': message_id, 'text': text, 'reply_markup': inline_keyboard},
             timeout=settings.REQUESTS_TIMEOUT
@@ -99,7 +99,7 @@ class Base(ABC):
     ):
         if reply_markup:
             reply_markup = json.dumps(reply_markup)
-        with self._session.get(f'{self._BASE_URL}sendAnimation', params={
+        with self.session.get(f'{self._BASE_URL}sendAnimation', params={
             **self._BASE_PARAM,
             'animation': animation,
             'caption': caption,

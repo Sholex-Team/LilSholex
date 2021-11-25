@@ -6,20 +6,28 @@ class ObjectType(Enum):
     PLAYLIST_VOICE = '1'
     PLAYLIST = '2'
     PRIVATE_VOICE = '3'
-    FAVORITE_VOICE = '4'
     SUGGESTED_VOICE = '5'
+    SUGGESTED_VIDEO = '6'
+    SUGGESTED_MEME = '7'
 
 
-class InvalidVoiceTag(ValueError):
+class InvalidMemeTag(ValueError):
     def __str__(self):
-        return 'invalid_voice_tag'
+        return 'invalid_meme_tag'
 
 
-class LongVoiceTag(ValueError):
+class LongMemeTag(ValueError):
     def __str__(self):
-        return 'long_voice_tag'
+        return 'long_meme_tag'
 
 
-class TooManyVoiceTags(ValueError):
+class TooManyMemeTags(ValueError):
     def __str__(self):
-        return 'too_many_voice_tags'
+        return 'too_many_meme_tags'
+
+
+@unique
+class ReportResult(Enum):
+    REPORTED = auto()
+    REPORTED_BEFORE = auto()
+    REPORT_FAILED = auto()

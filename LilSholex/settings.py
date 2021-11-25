@@ -20,6 +20,8 @@ with open(SECRETS_PATH / 'persianmeme_messages') as persian_meme_messages:
     MEME_MESSAGES = persian_meme_messages.read().removesuffix('\n')
 with open(SECRETS_PATH / 'persianmeme_help_messages') as persian_meme_help_messages:
     MEME_HELP_MESSAGES = persian_meme_help_messages.read()
+with open(SECRETS_PATH / 'persianmeme_reports') as persian_meme_reports:
+    MEME_REPORTS_CHANNEL = persian_meme_reports.read().removesuffix('\n')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 with open(SECRETS_PATH / 'domain') as domain_file:
@@ -118,7 +120,7 @@ USE_TZ = False
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR.joinpath('static')
+STATIC_ROOT = BASE_DIR / 'static'
 MAX_ATTEMPTS = 2
 BACKGROUND_TASK_RUN_ASYNC = True
 BACKGROUND_TASK_ASYNC_THREADS = 4
@@ -129,5 +131,20 @@ BROADCAST_LIMIT = 20
 BROADCAST_CONNECTION_LIMIT = 20
 
 # Admin Panel
-MAX_FAKE_VOTE = 50
-MIN_FAKE_VOTE = 20
+MAX_FAKE_VOTE = 80
+MIN_FAKE_VOTE = 40
+
+# Timeouts
+REQUESTS_TIMEOUT = 0.7
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.memcached.PyMemcacheCache',
+        'LOCATION': 'memcached:11211'
+    }
+}
+SPAM_COUNT = 10
+SPAM_TIME = 5
+SPAM_PENALTY = 1800
+VIOLATION_REPORT_LIMIT = 5
+VIDEO_DURATION_LIMIT = 180
+VIDEO_SIZE_LIMIT = 15728640
