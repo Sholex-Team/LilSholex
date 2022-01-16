@@ -15,6 +15,9 @@ from .menus import (
     delete_logs,
     reports
 )
+from persianmeme.translations import admin_messages
+from persianmeme.keyboards import processed
+from django.conf import settings
 
 
 def handler(request, callback_query, user_chat_id):
@@ -64,6 +67,10 @@ def handler(request, callback_query, user_chat_id):
             try:
                 report = Report.objects.get(meme__id=meme_id, status=Report.Status.PENDING)
             except Report.DoesNotExist:
+                answer_query(query_id, admin_messages['meme_already_processed'], False)
+                functions.edit_message_reply_markup(
+                    settings.MEME_REPORTS_CHANNEL, processed, message_id, session=inliner.session
+                )
                 inliner.database.save()
                 raise RequestInterruption()
             reports.handler(command, query_id, message_id, answer_query, report, inliner)

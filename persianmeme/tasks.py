@@ -1,11 +1,11 @@
 from .models import Meme
-from background_task import background
 from zoneinfo import ZoneInfo
 from datetime import datetime
-from background_task.models import CompletedTask
+from LilSholex import celery_app
+from django.conf import settings
 
 
-@background(schedule=3600)
+@celery_app.task
 def revoke_review(meme_id: int):
     try:
         target_meme = Meme.objects.get(id=meme_id, reviewed=False, status=Meme.Status.ACTIVE)
@@ -15,19 +15,21 @@ def revoke_review(meme_id: int):
     target_meme.save()
 
 
-@background(schedule=21600)
+@celery_app.task
 def check_meme(meme_id: int):
-    CompletedTask.objects.all().delete()
     try:
         meme = Meme.objects.get(id=meme_id, status=Meme.Status.PENDING)
     except Meme.DoesNotExist:
         return
     if datetime.now(ZoneInfo('Asia/Tehran')).hour < 8:
-        return check_meme(meme_id)
+        meme.task_id = check_meme.apply_async((meme_id,), countdown=settings.CHECK_MEME_COUNTDOWN)
+        meme.save()
+        return
     accept_count = meme.accept_vote.count()
     deny_count = meme.deny_vote.count()
     if accept_count == deny_count == 0:
-        return check_meme(meme_id)
+        meme.task_id = check_meme.apply_async((meme_id,), countdown=settings.CHECK_MEME_COUNTDOWN)
+        meme.save()
     else:
         meme.delete_vote()
         if accept_count >= deny_count:

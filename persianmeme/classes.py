@@ -64,7 +64,7 @@ class User(Base):
             self.__ads = models.Ad.objects.exclude(seen=user)
         return user
 
-    def delete_current_voice(self):
+    def delete_current_meme(self):
         if self.database.current_meme:
             self.database.current_meme.delete(admin=self.database, log=True)
             self.send_message(translations.admin_messages['deleted'])
@@ -78,18 +78,9 @@ class User(Base):
             status=models.Meme.Status.ACTIVE,
             type=meme_type
         )).exists():
-            result.first().delete(admin=self.database, log=True)
-
-    @sync_fix
-    def __delete_voting(self, message_id: int):
-        with self.session.get(
-            f'{self._BASE_URL}deleteMessage',
-            params={'chat_id': settings.MEME_CHANNEL, 'message_id': message_id},
-            timeout=settings.REQUESTS_TIMEOUT
-        ) as response:
-            if response.status_code != 429:
-                return
-            raise TooManyRequests(response.json()['parameters']['retry_after'])
+            target_meme = result.first()
+            target_meme.assigned_admin = self.database
+            target_meme.delete(admin=self.database, log=True)
 
     def cancel_voting(self, meme_type: models.MemeType):
         if not (pending_memes := models.Meme.objects.filter(
@@ -100,7 +91,7 @@ class User(Base):
             ))
             return
         for pending_meme in pending_memes:
-            self.__delete_voting(pending_meme.message_id)
+            pending_meme.delete_vote()
             pending_meme.delete()
         self.send_message(translations.user_messages['voting_canceled'].format(
             translations.user_messages['voice' if meme_type == models.MemeType.VOICE else 'video']
@@ -508,7 +499,7 @@ class User(Base):
             self.database.menu_mode == self.database.MenuMode.USER else \
             translations.admin_messages[key].format(*formatting_args)
 
-    def __check_voice_tags(self, tags: str):
+    def __check_meme_tags(self, tags: str):
         if 'tags:' in tags:
             raise InvalidMemeTag()
         if len(tags) >= len(punctuation):
@@ -530,7 +521,7 @@ class User(Base):
             self.send_message(self.translate('send_meme_tags', self.temp_meme_translation))
             return False
         try:
-            self.__check_voice_tags(tags)
+            self.__check_meme_tags(tags)
         except ValueError as e:
             self.send_message(self.translate(str(e), self.temp_meme_translation))
             return False
@@ -570,7 +561,7 @@ class User(Base):
 
     def validate_meme_name(self, message: dict, text: str, meme_type: models.MemeType or int):
         if not text or \
-                message.get('entities') or len(text) > 50 or text.startswith('tags:') or \
+                message.get('entities') or len(text) > 80 or text.startswith('tags:') or \
                 text.startswith('names:'):
             self.send_message(
                 self.translate('invalid_meme_name', self.translate(
@@ -696,7 +687,7 @@ class User(Base):
             self.database.current_meme = new_meme.first()
             self.database.current_meme.assigned_admin = self.database
             self.database.current_meme.save()
-            revoke_review(self.database.current_meme.id)
+            revoke_review.apply_async((self.database.current_meme.id,), countdown=settings.REVOKE_REVIEW_COUNTDOWN)
         else:
             self.send_message(translations.admin_messages['no_meme_to_review'])
             return False

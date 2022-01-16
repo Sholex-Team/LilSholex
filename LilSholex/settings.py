@@ -35,8 +35,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'background_task',
-    'persianmeme.apps.PersianmemeConfig'
+    'persianmeme.apps.PersianmemeConfig',
 ]
 
 MIDDLEWARE = [
@@ -122,8 +121,6 @@ USE_TZ = False
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'static'
 MAX_ATTEMPTS = 2
-BACKGROUND_TASK_RUN_ASYNC = True
-BACKGROUND_TASK_ASYNC_THREADS = 4
 
 # Pagination Limit Broadcast
 PAGINATION_LIMIT = 1500
@@ -146,5 +143,12 @@ SPAM_COUNT = 10
 SPAM_TIME = 5
 SPAM_PENALTY = 1800
 VIOLATION_REPORT_LIMIT = 5
-VIDEO_DURATION_LIMIT = 180
-VIDEO_SIZE_LIMIT = 15728640
+VIDEO_DURATION_LIMIT = 240
+VIDEO_SIZE_LIMIT = 20971520
+# Celery
+CELERY_BROKER_URL = 'amqp://guest:guest@rabbitmq:5672/'
+CELERY_WORKER_STATE_DB = str(BASE_DIR / 'state' / 'celery_state')
+REVOKE_REVIEW_COUNTDOWN = 3600
+CHECK_MEME_COUNTDOWN = 21600
+# CSRF
+CSRF_TRUSTED_ORIGINS = [f'https://{ALLOWED_HOSTS[0]}']

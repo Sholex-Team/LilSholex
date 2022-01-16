@@ -221,7 +221,8 @@ class Meme(admin.ModelAdmin):
             'deny_vote',
             'usage_count',
             'reviewed',
-            'previous_status'
+            'previous_status',
+            'task_id'
         )})
     )
 
@@ -282,7 +283,7 @@ class Message(admin.ModelAdmin):
 
 
 @admin.register(models.MemeTag)
-class MemeTa(admin.ModelAdmin):
+class MemeTag(admin.ModelAdmin):
     list_display = ('tag',)
     search_fields = ('tag',)
     list_per_page = 30
@@ -319,7 +320,7 @@ class Report(admin.ModelAdmin):
         'meme__id',
         'meme__name',
         'meme__file_id',
-        'meme__unique_file_id'
+        'meme__file_unique_id'
     )
     raw_id_fields = ('meme', 'reporters')
     fieldsets = (('Information', {'fields': ('meme', 'reporters')}), ('Status', {'fields': ('status',)}))

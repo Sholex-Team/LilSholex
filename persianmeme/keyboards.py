@@ -81,6 +81,7 @@ meme_review = {'keyboard': [
 deleted = {'inline_keyboard': [[{'text': 'Deleted 🗑', 'callback_data': 'none'}]]}
 recovered = {'inline_keyboard': [[{'text': 'Recovered ♻', 'callback_data': 'none'}]]}
 dismissed = {'inline_keyboard': [[{'text': 'Dismissed ✔', 'callback_data': 'none'}]]}
+processed = {'inline_keyboard': [[{'text': 'Processed ✔', 'callback_data': 'none'}]]}
 
 
 def suggestion_vote(meme_id: int):

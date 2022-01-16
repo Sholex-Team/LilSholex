@@ -9,6 +9,7 @@ from uuid import uuid4
 from . import translations
 from functools import cached_property
 from LilSholex.exceptions import TooManyRequests
+from LilSholex.celery import celery_app
 
 
 class MemeType(models.IntegerChoices):
@@ -120,7 +121,7 @@ class User(models.Model):
     status = models.CharField(max_length=1, choices=Status.choices, default=Status.ACTIVE)
     rank = models.CharField(max_length=1, choices=Rank.choices, default=Rank.USER)
     username = models.CharField(max_length=35, null=True, blank=True)
-    temp_meme_name = models.CharField(max_length=50, null=True, verbose_name='Temporary Meme Name', blank=True)
+    temp_meme_name = models.CharField(max_length=80, null=True, verbose_name='Temporary Meme Name', blank=True)
     temp_user_id = models.BigIntegerField(null=True, verbose_name='Temporary User ID', blank=True)
     temp_meme_tags = models.ManyToManyField(
         MemeTag, 'user_voice_tags', blank=True, verbose_name='Temporary Voice Tags'
@@ -199,6 +200,7 @@ class Meme(models.Model):
     reviewed = models.BooleanField('Is Reviewed', default=False)
     type = models.PositiveSmallIntegerField('Meme Type', choices=MemeType.choices, default=MemeType.VOICE)
     description = models.CharField(max_length=120, blank=True, null=True)
+    task_id = models.CharField(max_length=36, blank=True, null=True)
 
     class Meta:
         db_table = 'persianmeme_memes'
@@ -281,7 +283,7 @@ class Meme(models.Model):
                 meme_recovery(self.id),
                 translations.admin_messages['deleted_by_admins'].format(
                     translations.admin_messages[self.type_string],
-                    kwargs.pop("admin") if kwargs.get('admin') else '',
+                    kwargs.pop('admin'),
                     self.file_id
                 )
             )
@@ -291,15 +293,15 @@ class Meme(models.Model):
 
     @sync_fix
     def delete_vote(self, session: requests.Session = requests.Session()):
-        from background_task.models import Task
-
-        Task.objects.filter(task_name='persianmeme.tasks.check_meme', task_params=f'[[{self.id}], ''{}]').delete()
+        celery_app.control.revoke(self.task_id)
         with session.get(
                 f'https://api.telegram.org/bot{settings.MEME}/deleteMessage',
                 params={'chat_id': settings.MEME_CHANNEL, 'message_id': self.message_id},
                 timeout=settings.REQUESTS_TIMEOUT
-        ):
-            return
+        ) as response:
+            if response.status_code != 429:
+                return
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
 
     def send_vote(self, session: requests.Session = requests.Session()):
         from persianmeme.tasks import check_meme
@@ -310,7 +312,8 @@ class Meme(models.Model):
             suggestion_vote(self.id)
         )
         self.save()
-        check_meme(self.id)
+        self.task_id = check_meme.apply_async((self.id,), countdown=settings.CHECK_MEME_COUNTDOWN)
+        self.save()
 
 
 class Ad(models.Model):

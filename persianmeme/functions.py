@@ -294,3 +294,4 @@ def fake_deny_vote(queryset):
                 meme.deny_vote.count() < (random_fake := randint(fake_min, fake_max)):
             faked_count += 1
             meme.deny_vote.set(models.User.objects.all()[:random_fake])
+    return faked_count

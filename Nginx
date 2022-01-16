@@ -1,6 +1,6 @@
 FROM ubuntu:impish
-ARG NGINX_VERSION=nginx-1.21.4
-ARG OPENSSL_VERSION=openssl-3.0.0
+ARG NGINX_VERSION=nginx-1.21.5
+ARG OPENSSL_VERSION=openssl-3.0.1
 # Compiling
 RUN apt update && DEBIAN_FRONTEND="noninteractive" apt install -y build-essential \
     libpcre3 libpcre3-dev zlib1g zlib1g-dev libssl-dev python3.9 python3-pip wget  \

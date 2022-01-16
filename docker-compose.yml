@@ -1,7 +1,7 @@
 version: "3.8"
 services:
   db:
-    image: mysql:8.0.26
+    image: mysql:8.0.27
     command: --default-authentication-plugin=mysql_native_password
     environment:
         MYSQL_ROOT_PASSWORD_FILE: "/run/secrets/db_password"
@@ -37,15 +37,57 @@ services:
         delay: 5s
         failure_action: pause
         monitor: 10s
-        order: start-first
+        order: stop-first
     networks:
       - db_django
     volumes:
-    - type: volume
-      source: db
-      target: /var/lib/mysql
+      - type: volume
+        source: db
+        target: /var/lib/mysql
+    configs:
+      - source: mysql
+        target: /etc/mysql/conf.d/mysql.cnf
+  rabbitmq:
+    image: rabbitmq:3.9.12
+    healthcheck:
+      test: "rabbitmq-diagnostics -q ping"
+      interval: 30s
+      timeout: 5s
+      start_period: 5m
+      retries: 3
+    networks:
+      - tasks_django
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.task_master==true
+      restart_policy:
+        condition: any
+        max_attempts: 3
+        window: 20s
+        delay: 10s
+      update_config:
+        parallelism: 1
+        delay: 2s
+        failure_action: rollback
+        monitor: 10s
+        order: stop-first
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        failure_action: pause
+        monitor: 10s
+        order: stop-first
+    volumes:
+      - type: volume
+        source: rabbitmq_dump
+        target: /var/lib/rabbitmq
+    configs:
+      - source: rabbitmq
+        target: /etc/rabbitmq/rabbitmq.conf
   nginx:
-    image: ghcr.io/sholex-team/nginx:3.7
+    image: ghcr.io/sholex-team/nginx:3.8
     networks:
       - nginx_lilsholex
       - internet
@@ -59,7 +101,7 @@ services:
       - gunicorn
       - daphne
     volumes:
-      - ./static:/root/static:ro
+      - ./lilsholex-dev/static:/root/lilsholex/static:ro
       - type: volume
         source: nginx
         target: /var/log/nginx
@@ -92,46 +134,51 @@ services:
       - ssl_key
       - dhparam
     ports:
-    - "443:443/tcp"
-    - "80:80/tcp"
-  gunicorn:
-    image: ghcr.io/sholex-team/lilsholex:5.2
+      - "443:443/tcp"
+      - "80:80/tcp"
+  lilsholex:
+    image: ghcr.io/sholex-team/lilsholex:5.3
     networks:
       - db_django
       - nginx_lilsholex
-      - internet
       - cache_django
+      - internet
+      - tasks_django
     secrets:
       - db_password
       - persianmeme_channel
-      - persianmeme_help_messages
+      - persianmeme_reports
+      - source: persianmeme_help_messages
+        target: persianmeme_help_messages
       - persianmeme_token
       - secret_key
       - persianmeme_logs
       - persianmeme_messages
-      - persianmeme_reports
+      - domain
     depends_on:
       - db
       - migrations
     healthcheck:
       test: python healthchecks/gunicorn.py
-      interval: 30s
-      timeout: 5s
-      start_period: 1m
+      interval: 20s
+      timeout: 20s
+      start_period: 30s
       retries: 3
     deploy:
-      replicas: 2
+      replicas: 6
       placement:
+        preferences:
+           - spread: node.labels.zone
         constraints:
           - node.labels.webserver==true
       update_config:
-        parallelism: 1
+        parallelism: 3
         delay: 5s
         failure_action: rollback
-        monitor: 10s
+        monitor: 5s
         order: start-first
       rollback_config:
-        parallelism: 1
+        parallelism: 2
         delay: 5s
         failure_action: pause
         monitor: 10s
@@ -141,31 +188,37 @@ services:
         max_attempts: 3
         window: 10s
         delay: 5s
-    volumes:
-      - type: volume
-        source: persianmeme
-        target: /home/sholex/persianmeme/migrations
-  tasks:
-    image: ghcr.io/sholex-team/lilsholex:5.2
-    command: bash -c "python manage.py clear_tasks && python manage.py process_tasks --sleep 15"
+  celery: &celery_base
+    image: ghcr.io/sholex-team/lilsholex-dev:6.1.5
+    command: "celery -A LilSholex worker -Q celery -l info -c 2 -E"
     networks:
       - db_django
       - internet
+      - tasks_django
     secrets:
       - db_password
       - secret_key
       - persianmeme_token
       - persianmeme_channel
-      - persianmeme_help_messages
+      - persianmeme_reports
+      - source: persianmeme_help_messages
+        target: persianmeme_help_messages
       - persianmeme_logs
       - persianmeme_messages
-      - persianmeme_reports
+      - domain
+    volumes:
+      - type: volume
+        source: state
+        target: /home/sholex/state
     depends_on:
       - db
       - migrations
+      - rabbitmq
     deploy:
       replicas: 1
       placement:
+        preferences:
+          - spread: node.labels.zone
         constraints:
           - node.labels.task_master==true
       update_config:
@@ -179,18 +232,21 @@ services:
         delay: 5s
         failure_action: pause
         monitor: 10s
-        order: start-first
+        order: stop-first
       restart_policy:
         condition: any
         max_attempts: 3
         window: 10s
         delay: 5s
-    volumes:
-      - type: volume
-        source: persianmeme
-        target: /home/sholex/persianmeme/migrations
-  broadcasts:
-    image: ghcr.io/sholex-team/lilsholex:5.2
+  celery_flower:
+      <<: *celery_base
+      command: "celery -A LilSholex flower --url_prefix=flower"
+      depends_on:
+        - celery
+      environment:
+        FLOWER_BASIC_AUTH: "sholex:flower_password"
+  lilsholex_broadcasts:
+    image: ghcr.io/sholex-team/lilsholex:5.3
     command: "python manage.py process_broadcasts"
     networks:
       - db_django
@@ -200,10 +256,12 @@ services:
       - secret_key
       - persianmeme_token
       - persianmeme_channel
-      - persianmeme_help_messages
+      - persianmeme_reports
+      - source: persianmeme_help_messages
+        target: persianmeme_help_messages
       - persianmeme_logs
       - persianmeme_messages
-      - persianmeme_reports
+      - domain
     depends_on:
       - db
       - migrations
@@ -223,16 +281,12 @@ services:
         delay: 5s
         failure_action: pause
         monitor: 10s
-        order: start-first
+        order: stop-first
       restart_policy:
         condition: any
         max_attempts: 3
         window: 10s
         delay: 5s
-    volumes:
-      - type: volume
-        source: persianmeme
-        target: /home/sholex/persianmeme/migrations
   memcached:
     image: memcached:1.6.12
     command: "memcached -m 256"
@@ -262,25 +316,30 @@ services:
         failure_action: pause
         monitor: 10s
         order: start-first
-  migrations:
-    image: ghcr.io/sholex-team/lilsholex:5.2
-    command: "bash -c 'yes | python manage.py makemigrations persianmeme background_task && \
+  lilsholex_migrations:
+    image: ghcr.io/sholex-team/lilsholex:5.3
+    command: "bash -c 'yes | python manage.py makemigrations persianmeme && \
     yes | python manage.py migrate && python manage.py collectstatic --noinput'"
     secrets:
       - db_password
       - secret_key
       - persianmeme_token
       - persianmeme_channel
-      - persianmeme_help_messages
+      - persianmeme_reports
+      - source: persianmeme_help_messages
+        target: persianmeme_help_messages
       - persianmeme_logs
       - persianmeme_messages
-      - persianmeme_reports
+      - domain
     depends_on:
       - db
     networks:
       - db_django
     deploy:
       replicas: 1
+      placement:
+        constraints:
+          - node.labels.db==true
       update_config:
         parallelism: 1
         delay: 5s
@@ -292,7 +351,7 @@ services:
         delay: 5s
         failure_action: pause
         monitor: 10s
-        order: start-first
+        order: stop-first
       restart_policy:
         condition: on-failure
         max_attempts: 3
@@ -311,12 +370,16 @@ networks:
     driver: "overlay"
     name: "nginx_lilsholex"
     internal: true
-  internet:
-    driver: "overlay"
-    name: "internet"
   cache_django:
     driver: "overlay"
     name: "cache_django"
+    internal: true
+  internet:
+    driver: "overlay"
+    name: "internet"
+  tasks_django:
+    driver: "overlay"
+    name: "tasks_django"
     internal: true
 volumes:
   db:
@@ -325,6 +388,10 @@ volumes:
     name: "persianmeme"
   nginx:
     name: "nginx"
+  state:
+    name: "state"
+  rabbitmq_dump:
+    name: "rabbitmq_dump"
 secrets:
   db_password:
     external: true
@@ -336,10 +403,10 @@ secrets:
     external: true
   persianmeme_messages:
     external: true
-  persianmeme_help_messages:
-    file: secrets/help_messages.json
   persianmeme_reports:
     external: true
+  persianmeme_help_messages:
+    file: lilsholex-dev/secrets/help_messages.json # Replace file_id of animations.
   secret_key:
     external: true
   ssl_certificate:
@@ -350,3 +417,8 @@ secrets:
     file: ./ssl/dhparam.pem
   domain:
     external: true
+configs:
+  mysql:
+    file: conf/my.cnf # Change MySQL configuration based on your host.
+  rabbitmq:
+    file: conf/rabbitmq.conf

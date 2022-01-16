@@ -34,7 +34,7 @@ def handler(command: str, query_id: str, message_id: int, answer_query, report: 
             )
         answer_query(query_id, translations.admin_messages['deleted'], True)
         edit_message_reply_markup(
-            settings.MEME_REPORTS_CHANNEL, deleted, message_id=message_id, session=inliner.session
+            settings.MEME_REPORTS_CHANNEL, deleted, message_id, session=inliner.session
         )
     else:
         if report.meme.status == Meme.Status.REPORTED:

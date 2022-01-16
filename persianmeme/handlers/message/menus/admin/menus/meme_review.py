@@ -26,7 +26,7 @@ def handler(text: str, message_id: int, user: UserClass):
                     admin_messages['edit_meme_description'].format(user.current_meme_translation), en_back
                 )
             case 'Delete 🗑':
-                user.delete_current_voice()
+                user.delete_current_meme()
                 if not user.assign_meme():
                     user.go_back()
             case 'Check the Meme':
