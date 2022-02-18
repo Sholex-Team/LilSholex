@@ -23,7 +23,7 @@ click-plugins==1.1.1
 click-repl==0.2.0
 constantly==15.1.0
 cryptography==36.0.1
-Django==4.0.1
+Django==4.0.2
 flower==1.0.0
 frozenlist==1.2.0
 gunicorn==20.1.0
