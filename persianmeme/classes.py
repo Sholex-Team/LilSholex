@@ -130,13 +130,18 @@ class User(Base):
 
     @sync_fix
     def copy_message(
-            self, message_id: int, reply_markup: dict = '', from_chat_id: int = None, chat_id: int = None
+            self,
+            message_id: int,
+            reply_markup: dict = '',
+            from_chat_id: int = None,
+            chat_id: int = None,
+            protect_content: bool = False
     ):
         assert (chat_id and not from_chat_id) or (from_chat_id and not chat_id),\
             'You must use a chat_id or a from_chat_id !'
         if reply_markup:
             reply_markup = json.dumps(reply_markup)
-        base_param = {'message_id': message_id, 'reply_markup': reply_markup}
+        base_param = {'message_id': message_id, 'reply_markup': reply_markup, 'protect_content': protect_content}
         with self.session.get(
             f'{self._BASE_URL}copyMessage',
             params={

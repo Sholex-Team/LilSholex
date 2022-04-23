@@ -51,10 +51,7 @@ admin_messages = {
     'requested_meme': 'Your requested {0} 👆',
     'vote_before': 'You have voted this {0} before !\nVotes will get updated every 3 minutes 🔄',
     'voted': 'Your vote has been submitted ✔️',
-    'not_voted': 'You haven\'t voted yet !',
     'voice_voted': 'You have voted this voice 👍',
-    'voted_before': 'You have voted this {0} before !',
-    'took_vote_back': 'You have taken your vote back  👎',
     'send_meme_tags': 'Please send {0} tags(one tag per line).',
     'invalid_meme_tag': 'Tags contain invalid characters !',
     'long_meme_tag': 'Tags are too long !',
@@ -97,7 +94,8 @@ admin_messages = {
     'new_delete_request': 'New delete request 🗑',
     'report_dismissed': 'Report has been dismissed ✔',
     'description': '<b>Description</b>: <code>{0}</code>\n\n',
-    'meme_already_processed': 'Meme was already processed ✔'
+    'meme_already_processed': 'Meme was already processed ✔',
+    'god_mode': 'God Mode Activated 🔛\n\nUse Back 🔙 button to disable it.'
 }
 user_messages = {
     'back': 'شما به منوی اصلی بازگشتید 🔙',
@@ -106,6 +104,13 @@ user_messages = {
     'vote_before': 'شما قبلا به این {0} رای داده اید ⚠️\nنتایج هر ۳ دقیقه به روزرسانی می شوند 🔄',
     'voted': 'رای شما ثبت شد ✔️',
     'donate': '''برای حمایت مالی از ما می توانید از روش های زیر استفاده کنید 👇
+
+    PayPing : https://payping.ir/RezFD
+
+    IDPay : https://idpay.ir/persianmeme
+    
+    TON : `EQACYOxZgT94vwSqUq77YJzLCRKxA7JW4W60AM8ZT3k6_eG5`
+
     از حمایت های شما مچکریم 🙏''',
     'managing_playlist': 'مدیریت پلی لیست ⚙️',
     'manage_meme': 'مدیریت {0} ⚙️',

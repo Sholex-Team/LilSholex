@@ -6,7 +6,7 @@ admin = {'keyboard': [
     ['Broadcast', 'Message User'],
     ['Get User', 'Started Count'],
     ['Add Ad', 'Delete Ad', 'Edit Ad'],
-    ['Accept Meme', 'Ban Vote', 'Deny Meme'],
+    ['Ban Vote', 'God Mode'],
     ['Edit Meme', 'File ID', 'Meme Review'],
     ['Messages', 'Delete Requests'],
     ['Broadcast Status', 'Member Count']

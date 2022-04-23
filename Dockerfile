@@ -1,4 +1,4 @@
-FROM python:3.10.1
+FROM python:3.10.4
 # Addding requirements
 COPY requirements.txt requirements.txt
 RUN pip install -U pip && pip install -r requirements.txt --no-cache-dir

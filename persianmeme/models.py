@@ -71,8 +71,6 @@ class User(models.Model):
         ADMIN_EDIT_AD_ID = 14, 'Admin Edit Ad ID'
         ADMIN_EDIT_AD = 15, 'Admin Edit Ad'
         ADMIN_BAN_VOTE = 16, 'Admin Ban Vote'
-        ADMIN_DENY_MEME = 17, 'Admin Deny Meme'
-        ADMIN_ACCEPT_MEME = 18, 'Admin Accept Meme'
         ADMIN_GET_MEME = 40, 'Admin Get Meme'
         ADMIN_MEME_TAGS = 42, 'Admin Meme Tags'
         ADMIN_SEND_EDIT_MEME = 44, 'Admin Send Edit Meme'
@@ -85,6 +83,7 @@ class User(models.Model):
         ADMIN_MEME_TYPE = 57, 'Admin Meme Type'
         ADMIN_EDIT_MEME_TAGS_AND_DESCRIPTION = 62, 'Admin Edit Meme Tags and Description'
         ADMIN_EDIT_MEME_DESCRIPTION = 63, 'Admin Edit Meme Description'
+        ADMIN_GOD_MODE = 65, 'Admin God Mode'
         USER_MAIN = 19, 'User Main'
         USER_CONTACT_ADMIN = 20, 'User Contact Admin'
         USER_SUGGEST_MEME_NAME = 21, 'User Suggest Meme Name'
@@ -211,6 +210,7 @@ class Meme(models.Model):
 
     def accept(self, session: requests.Session = requests.Session()):
         from .functions import send_message
+        self.delete_vote(session)
         self.status = self.Status.ACTIVE
         self.save()
         self.accept_vote.clear()
@@ -221,6 +221,7 @@ class Meme(models.Model):
 
     def deny(self, session: requests.Session = requests.Session()):
         from .functions import send_message
+        self.delete_vote(session)
         send_message(self.sender.chat_id, translations.user_messages['meme_denied'].format(
             translations.user_messages[self.type_string]
         ), session)

@@ -138,10 +138,7 @@ class User(admin.ModelAdmin):
 class Meme(admin.ModelAdmin):
     @admin.display(description='Accept Votes')
     def accept_vote(self, request: HttpRequest, queryset):
-        result = [
-            (target_meme, target_meme.accept(), target_meme.delete_vote())
-            for target_meme in queryset if target_meme.status == 'p'
-        ]
+        result = [(target_meme, target_meme.accept()) for target_meme in queryset if target_meme.status == 'p']
         result_len = len(result)
         if result_len == 0:
             self.message_user(request, 'There is no need to accept these memes !')

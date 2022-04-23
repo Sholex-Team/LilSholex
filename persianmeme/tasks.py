@@ -31,7 +31,6 @@ def check_meme(meme_id: int):
         meme.task_id = check_meme.apply_async((meme_id,), countdown=settings.CHECK_MEME_COUNTDOWN)
         meme.save()
     else:
-        meme.delete_vote()
         if accept_count >= deny_count:
             meme.accept()
         else:

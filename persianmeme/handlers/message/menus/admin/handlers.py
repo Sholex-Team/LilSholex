@@ -20,8 +20,6 @@ from .menus import (
     edit_ad_id,
     edit_ad,
     ban_vote,
-    deny_meme,
-    accept_meme,
     send_edit_meme,
     file_id,
     edit_meme_name,
@@ -67,10 +65,6 @@ def handler(message: dict, text: str, message_id: int, user: UserClass):
             edit_ad.handler(message_id, user)
         case User.Menu.ADMIN_BAN_VOTE if target_vote := user.get_vote(message):
             ban_vote.handler(target_vote, user)
-        case User.Menu.ADMIN_DENY_MEME if target_meme := user.get_vote(message):
-            deny_meme.handler(target_meme, user)
-        case User.Menu.ADMIN_ACCEPT_MEME if target_meme := user.get_vote(message):
-            accept_meme.handler(target_meme, user)
         case User.Menu.ADMIN_SEND_EDIT_MEME if target_meme := user.get_public_meme(message):
             send_edit_meme.handler(target_meme, user)
         case User.Menu.ADMIN_EDIT_MEME:
