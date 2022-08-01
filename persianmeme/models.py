@@ -24,7 +24,6 @@ class MemeTag(models.Model):
         ordering = ['tag']
         db_table = 'persianmeme_meme_tags'
 
-
 class User(models.Model):
     class Status(models.TextChoices):
         ACTIVE = 'a', 'Active'
@@ -95,6 +94,8 @@ class User(models.Model):
         USER_PRIVATE_VOICE_NAME = 28, 'User Private Voice Name'
         USER_MANAGE_PRIVATE_VOICE = 29, 'User Manage Private Voice'
         USER_PRIVATE_VOICE = 30, 'User Private Voice'
+        USER_TRIM_VOICE_YES_OR_NO = 99, 'User Trim Voice Yes Or No'
+        USER_TRIM_DURATION = 88, 'User Trim Duration'
         USER_PLAYLISTS = 35, 'User Playlists'
         USER_CREATE_PLAYLIST = 36, 'User Create Playlist'
         USER_MANAGE_PLAYLIST = 37, 'User Manage Playlist'
@@ -125,6 +126,9 @@ class User(models.Model):
     temp_meme_tags = models.ManyToManyField(
         MemeTag, 'user_voice_tags', blank=True, verbose_name='Temporary Voice Tags'
     )
+    
+    last_meme = models.ForeignKey('Meme', models.SET_NULL, blank=True, null=True, default=None)
+    last_meme_file = models.CharField(max_length=256, blank=True, null=True, default=None)
     last_usage_date = models.DateTimeField(auto_now=True)
     vote = models.BooleanField(verbose_name='Vote System', default=False)
     date = models.DateTimeField(verbose_name='Register Date', auto_now_add=True)

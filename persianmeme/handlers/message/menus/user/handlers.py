@@ -28,7 +28,9 @@ from .menus import (
     add_voice_playlist,
     help,
     report_meme,
-    search_items
+    search_items,
+    trim_voice_yes_or_no,
+    user_trim_duration
 )
 
 
@@ -91,3 +93,7 @@ def handler(message: dict, text: str, message_id: int, user: UserClass):
             report_meme.handler(message, message_id, user)
         case User.Menu.USER_SEARCH_ITEMS:
             search_items.handler(text, message_id, user)
+        case User.Menu.USER_TRIM_VOICE_YES_OR_NO:
+            trim_voice_yes_or_no.handler(text, user)
+        case User.Menu.USER_TRIM_DURATION:
+            user_trim_duration.handler(text, user)

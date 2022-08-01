@@ -1,3 +1,4 @@
+from httpcore import stream
 from LilSholex.decorators import sync_fix
 import json
 from persianmeme.models import User as PersianMemeUser
@@ -60,6 +61,65 @@ class Base(ABC):
             if response.status_code == 200:
                 if (result := response.json())['ok']:
                     return result['result']['message_id']
+            elif response.status_code != 429:
+                return 0
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
+    
+    def send_voice(
+            self,
+            file_path,
+            caption = ""
+    ) -> int:
+        with self.session.get(
+            f'{self._BASE_URL}sendVoice',
+            params={
+                **self._BASE_PARAM,
+                'caption': caption
+            },
+            files={'voice': open(file_path, 'rb')},
+            timeout=settings.REQUESTS_TIMEOUT
+        ) as response:
+            if response.status_code == 200:
+                if (result := response.json())['ok']:
+                    return result['result']
+            elif response.status_code != 429:
+                return 0
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
+
+    @sync_fix
+    def get_file_path(
+            self,
+            file_id: str
+    ) -> str:
+        with self.session.get(
+            f'{self._BASE_URL}getFile',
+            params={
+                **self._BASE_PARAM,
+                'file_id': file_id
+            },
+            timeout=settings.REQUESTS_TIMEOUT
+        ) as response:
+            if response.status_code == 200:
+                if (result := response.json())['ok']:
+                    return result['result']['file_path']
+            elif response.status_code != 429:
+                return 0
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
+
+    @sync_fix
+    def download_file(
+            self,
+            file_path: str,
+    ) -> str:
+        file_name = 'downloads/' + self.database.last_meme.file_id + '.ogg'
+        with self.session.get(
+            self._BASE_URL.replace('bot', 'file/') + file_path,
+            timeout=settings.REQUESTS_TIMEOUT
+        ) as response:
+            if response.status_code == 200:
+                with open(file_name, 'wb') as f:
+                    f.write(response.content)
+                return file_name
             elif response.status_code != 429:
                 return 0
             raise TooManyRequests(response.json()['parameters']['retry_after'])
