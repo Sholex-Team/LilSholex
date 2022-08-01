@@ -549,7 +549,6 @@ class User(Base):
         if not models.Meme.objects.filter(
                 file_unique_id=file_unique_id, visibility=models.Meme.Visibility.NORMAL
         ).exists():
-            self.database.last_suggested_meme_file_id = file_id
             new_meme = models.Meme.objects.create(
                 file_id=file_id,
                 file_unique_id=file_unique_id,
