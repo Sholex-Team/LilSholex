@@ -43,6 +43,7 @@ pyasn1==0.4.8
 pyasn1-modules==0.2.8
 pycares==4.2.0
 pycparser==2.21
+pydub
 PyHamcrest==2.0.3
 pymemcache==3.5.2
 pyOpenSSL==22.0.0
