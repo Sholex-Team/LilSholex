@@ -1,4 +1,3 @@
-from typing import Union
 from pydub import AudioSegment
 from LilSholex.persianmeme.models import Meme
 from persianmeme.keyboards import user as user_keyboard, back as back_keyboard
@@ -6,7 +5,7 @@ from persianmeme.models import User
 from persianmeme.classes import User as UserClass
 
 
-def duration_to_milliseconds(durations: list) -> Union[int, int]:
+def duration_to_milliseconds(durations: list):
     seconds = []
     for duration in durations:
         duration = reversed(duration)
