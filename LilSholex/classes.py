@@ -1,4 +1,3 @@
-from httpcore import stream
 from LilSholex.decorators import sync_fix
 import json
 from persianmeme.models import User as PersianMemeUser
@@ -94,7 +93,6 @@ class Base(ABC):
         with self.session.get(
             f'{self._BASE_URL}getFile',
             params={
-                **self._BASE_PARAM,
                 'file_id': file_id
             },
             timeout=settings.REQUESTS_TIMEOUT
