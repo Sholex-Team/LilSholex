@@ -111,7 +111,7 @@ class Base(ABC):
     ) -> str:
         file_name = 'downloads/' + self.database.last_meme.file_id + '.ogg'
         with self.session.get(
-            self._BASE_URL.replace('bot', 'file/') + file_path,
+            self._BASE_URL.replace('bot', 'file/bot') + file_path,
             timeout=settings.REQUESTS_TIMEOUT
         ) as response:
             if response.status_code == 200:
