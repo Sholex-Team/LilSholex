@@ -36,7 +36,7 @@ def handler(text: str, user: UserClass):
                 file_unique_id=result['file_unique_id'],
                 message_id=result['message_id']
             )
-            user.database.last_meme.send_vote(user.session)
+            Meme.objects.get(file_id=result['file_id']).send_vote(user.session)
             user.send_message(user.translate(
                 'meme_added', user.temp_meme_translation), user_keyboard)
 
