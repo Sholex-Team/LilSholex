@@ -29,7 +29,9 @@ def handler(text: str, user: UserClass):
             result.export(file_path.replace('ogg', 'mp3'), format='mp3')
             result = user.send_voice(file_path.replace(
                 'ogg', 'mp3'), "Trimmed !")['voice']
-            Meme.objects.filter(file_id=file_path.replace('.ogg', '')).update(
+            # Maybe regex ? : re.search(r'downloads/(.*)\.ogg', file_path).group(1)
+            old_file_id = file_path.replace('.ogg', '').replace('downloads/', '')
+            Meme.objects.filter(file_id=old_file_id).update(
                 file_id=result['file_id'],
                 file_unique_id=result['file_unique_id'],
                 message_id=result['message_id']
