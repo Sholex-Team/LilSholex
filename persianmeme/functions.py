@@ -268,10 +268,11 @@ def check_for_voice(message: dict):
     )
 
 
-def check_for_video(message: dict):
+def check_for_video(message: dict, bypass_limits: bool):
     return 'video' in message and (
         'mime_type' not in (video := message['video']) or video['mime_type'] == 'video/mp4'
-    ) and video['file_size'] <= settings.VIDEO_SIZE_LIMIT and video['duration'] <= settings.VIDEO_DURATION_LIMIT
+    ) and (bypass_limits or (video['file_size'] <= settings.VIDEO_SIZE_LIMIT and
+                             video['duration'] <= settings.VIDEO_DURATION_LIMIT))
 
 
 def create_description(tags):

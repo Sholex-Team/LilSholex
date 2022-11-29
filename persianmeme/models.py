@@ -77,6 +77,7 @@ class User(models.Model):
         ADMIN_EDIT_MEME = 45, 'Admin Edit Meme'
         ADMIN_EDIT_MEME_NAME = 46, 'Admin Edit Meme Name'
         ADMIN_EDIT_MEME_TAGS = 47, 'Admin Edit Meme Tags'
+        ADMIN_EDIT_MEME_FILE = 66, 'Admin Edit Meme File'
         ADMIN_FILE_ID = 48, 'Admin File ID'
         ADMIN_MEME_REVIEW = 54, 'Admin Meme Review'
         ADMIN_BROADCAST_STATUS = 55, 'Admin Broadcast Status'
@@ -119,7 +120,6 @@ class User(models.Model):
     menu = models.PositiveSmallIntegerField(verbose_name='Current Menu', choices=Menu.choices, default=Menu.USER_MAIN)
     status = models.CharField(max_length=1, choices=Status.choices, default=Status.ACTIVE)
     rank = models.CharField(max_length=1, choices=Rank.choices, default=Rank.USER)
-    username = models.CharField(max_length=35, null=True, blank=True)
     temp_meme_name = models.CharField(max_length=80, null=True, verbose_name='Temporary Meme Name', blank=True)
     temp_user_id = models.BigIntegerField(null=True, verbose_name='Temporary User ID', blank=True)
     temp_meme_tags = models.ManyToManyField(
@@ -142,7 +142,7 @@ class User(models.Model):
         verbose_name='Current Playlist',
         default=None
     )
-    current_meme = models.ForeignKey('Meme', models.SET_NULL, 'user_voice', blank=True, null=True, default=None)
+    current_meme = models.ForeignKey('Meme', models.SET_NULL, 'user_current_memes', blank=True, null=True, default=None)
     current_ad = models.ForeignKey('Ad', models.SET_NULL, 'user_ad', null=True, blank=True)
     menu_mode = models.CharField(
         max_length=1, verbose_name='Menu Mode', choices=MenuMode.choices, default=MenuMode.USER
@@ -336,6 +336,7 @@ class Delete(models.Model):
     user = models.ForeignKey(User, models.CASCADE, 'delete_user')
 
     class Meta:
+        ordering = ['id']
         db_table = 'persianmeme_deletes'
 
     def __str__(self):
@@ -388,6 +389,7 @@ class Message(models.Model):
     status = models.PositiveSmallIntegerField(choices=Status.choices, default=Status.PENDING)
 
     class Meta:
+        ordering = ['id']
         db_table = 'persianmeme_messages'
 
     def __str__(self):
@@ -418,6 +420,20 @@ class Report(models.Model):
 
     class Meta:
         db_table = 'persianmeme_reports'
+        ordering = ['report_date']
+
+
+class Username(models.Model):
+    user = models.ForeignKey(User, models.CASCADE, 'usernames')
+    username = models.CharField(max_length=35)
+    creation_date = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['id']
+        constraints = (models.UniqueConstraint(fields=('user', 'username'), name='unique_usernames'),)
+
+    def __str__(self):
+        return f'{self.user.chat_id} : {self.username}'
 
 
 BOT_ADMINS = (User.Rank.ADMIN, User.Rank.OWNER)

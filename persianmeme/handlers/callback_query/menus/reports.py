@@ -12,9 +12,10 @@ def handler(command: str, query_id: str, message_id: int, answer_query, report: 
     if command == 'rep_accept':
         if report.meme.status == Meme.Status.PENDING:
             report.meme.delete_vote(inliner.session)
-        report.meme.previous_status = report.meme.status
-        report.meme.status = Meme.Status.REPORTED
-        report.meme.save()
+        if report.meme.status != Meme.Status.REPORTED:
+            report.meme.previous_status = report.meme.status
+            report.meme.status = Meme.Status.REPORTED
+            report.meme.save()
         report.meme.sender.report_violation_count = F('report_violation_count') + 1
         report.meme.sender.save()
         report.meme.sender.refresh_from_db()

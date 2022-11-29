@@ -1,7 +1,7 @@
 version: "3.8"
 services:
   db:
-    image: mysql:8.0.28
+    image: mysql:8.0.31
     command: --default-authentication-plugin=mysql_native_password
     environment:
         MYSQL_ROOT_PASSWORD_FILE: "/run/secrets/db_password"
@@ -12,7 +12,7 @@ services:
       - db_password
     healthcheck:
       test: mysqladmin -u root --password=`cat $MYSQL_ROOT_PASSWORD_FILE` ping
-      interval: 30s
+      interval: 10s
       retries: 3
       timeout: 10s
       start_period: 1m
@@ -45,15 +45,15 @@ services:
         source: db
         target: /var/lib/mysql
     configs:
-      - source: mysql
+      - source: mysql_2
         target: /etc/mysql/conf.d/mysql.cnf
   rabbitmq:
-    image: rabbitmq:3.9.15
+    image: rabbitmq:3.11.2
     healthcheck:
       test: "rabbitmq-diagnostics -q ping"
-      interval: 30s
+      interval: 10s
       timeout: 5s
-      start_period: 5m
+      start_period: 1m
       retries: 3
     networks:
       - tasks_django
@@ -87,19 +87,27 @@ services:
       - source: rabbitmq
         target: /etc/rabbitmq/rabbitmq.conf
   nginx:
-    image: ghcr.io/sholex-team/nginx:3.9
+    image: ghcr.io/sholex-team/nginx:4.0
     networks:
       - nginx_lilsholex
-      - internet
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: host
     healthcheck:
-      test: python3.9 nginx.py
-      interval: 30s
+      test: python3 nginx.py
+      interval: 10s
       timeout: 5s
-      start_period: 1m
+      start_period: 30s
       retries: 3
     depends_on:
       - gunicorn
-      - daphne
+      - celery_flower
     volumes:
       - ./static:/root/lilsholex/static:ro
       - type: volume
@@ -122,22 +130,22 @@ services:
         delay: 5s
         failure_action: rollback
         monitor: 10s
-        order: start-first
+        order: stop-first
       rollback_config:
         parallelism: 1
         delay: 5s
         failure_action: pause
         monitor: 10s
         order: stop-first
+    configs:
+      - source: nginx
+        target: /etc/nginx/nginx.conf
     secrets:
       - ssl_certificate
       - ssl_key
       - dhparam
-    ports:
-      - "443:443/tcp"
-      - "80:80/tcp"
   lilsholex:
-    image: ghcr.io/sholex-team/lilsholex:5.4
+    image: ghcr.io/sholex-team/lilsholex:5.5
     networks:
       - db_django
       - nginx_lilsholex
@@ -148,10 +156,10 @@ services:
       - db_password
       - persianmeme_channel
       - persianmeme_reports
-      - source: persianmeme_help_messages
-        target: persianmeme_help_messages
+      - persianmeme_help_messages
       - persianmeme_token
       - secret_key
+      - webhook_token
       - persianmeme_logs
       - persianmeme_messages
       - domain
@@ -160,19 +168,19 @@ services:
       - migrations
     healthcheck:
       test: python healthchecks/gunicorn.py
-      interval: 20s
-      timeout: 20s
+      interval: 10s
+      timeout: 5s
       start_period: 30s
       retries: 3
     deploy:
-      replicas: 6
+      replicas: 4
       placement:
         preferences:
            - spread: node.labels.zone
         constraints:
           - node.labels.webserver==true
       update_config:
-        parallelism: 3
+        parallelism: 2
         delay: 5s
         failure_action: rollback
         monitor: 5s
@@ -189,7 +197,7 @@ services:
         window: 10s
         delay: 5s
   celery: &celery_base
-    image: ghcr.io/sholex-team/lilsholex:5.4
+    image: ghcr.io/sholex-team/lilsholex:5.5
     command: "celery -A LilSholex worker -Q celery -l info -c 2 -E"
     networks:
       - db_django
@@ -198,11 +206,11 @@ services:
     secrets:
       - db_password
       - secret_key
+      - webhook_token
       - persianmeme_token
       - persianmeme_channel
       - persianmeme_reports
-      - source: persianmeme_help_messages
-        target: persianmeme_help_messages
+      - persianmeme_help_messages
       - persianmeme_logs
       - persianmeme_messages
       - domain
@@ -245,8 +253,13 @@ services:
         - celery
       environment:
         FLOWER_BASIC_AUTH: "sholex:flower_password"
+      networks:
+        - nginx_lilsholex
+        - db_django
+        - internet
+        - tasks_django
   lilsholex_broadcasts:
-    image: ghcr.io/sholex-team/lilsholex:5.4
+    image: ghcr.io/sholex-team/lilsholex:5.5
     command: "python manage.py process_broadcasts"
     networks:
       - db_django
@@ -254,11 +267,11 @@ services:
     secrets:
       - db_password
       - secret_key
+      - webhook_token
       - persianmeme_token
       - persianmeme_channel
       - persianmeme_reports
-      - source: persianmeme_help_messages
-        target: persianmeme_help_messages
+      - persianmeme_help_messages
       - persianmeme_logs
       - persianmeme_messages
       - domain
@@ -288,7 +301,7 @@ services:
         window: 10s
         delay: 5s
   memcached:
-    image: memcached:1.6.15
+    image: memcached:1.6.17
     command: "memcached -m 256"
     networks:
       - cache_django
@@ -317,17 +330,17 @@ services:
         monitor: 10s
         order: start-first
   lilsholex_migrations:
-    image: ghcr.io/sholex-team/lilsholex:5.4
+    image: ghcr.io/sholex-team/lilsholex:5.5
     command: "bash -c 'yes | python manage.py makemigrations persianmeme && \
     yes | python manage.py migrate && python manage.py collectstatic --noinput'"
     secrets:
       - db_password
       - secret_key
+      - webhook_token
       - persianmeme_token
       - persianmeme_channel
       - persianmeme_reports
-      - source: persianmeme_help_messages
-        target: persianmeme_help_messages
+      - persianmeme_help_messages
       - persianmeme_logs
       - persianmeme_messages
       - domain
@@ -358,6 +371,7 @@ services:
         window: 10s
         delay: 15s
     volumes:
+      - ./static:/home/sholex/static
       - type: volume
         source: persianmeme
         target: /home/sholex/persianmeme/migrations
@@ -409,6 +423,8 @@ secrets:
     file: ./secrets/help_messages.json # Replace file_id of animations.
   secret_key:
     external: true
+  webhook_token:
+    external: true
   ssl_certificate:
     file: ./ssl/fullchain.pem
   ssl_key:
@@ -418,6 +434,8 @@ secrets:
   domain:
     external: true
 configs:
+  nginx:
+    file: conf/nginx.conf # Update Nginx config
   mysql:
     file: conf/my.cnf # Change MySQL configuration based on your host.
   rabbitmq:

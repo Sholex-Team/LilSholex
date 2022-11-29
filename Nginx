@@ -1,11 +1,10 @@
-FROM ubuntu:impish
-ARG NGINX_VERSION=nginx-1.21.6
-ARG OPENSSL_VERSION=openssl-3.0.2
+FROM ubuntu:22.04
+ARG NGINX_VERSION=nginx-1.23.2
+ARG OPENSSL_VERSION=openssl-3.0.7
 # Compiling
 RUN apt update && DEBIAN_FRONTEND="noninteractive" apt install -y build-essential \
-    libpcre3 libpcre3-dev zlib1g zlib1g-dev libssl-dev python3.9 python3-pip wget  \
-    && apt autoremove -y && apt autoclean
-RUN python3.9 -m pip install --no-cache-dir requests
+    libpcre3 libpcre3-dev zlib1g zlib1g-dev python3 python3-pip wget && apt autoremove -y && apt autoclean
+RUN python3 -m pip install --no-cache-dir requests
 WORKDIR /root
 RUN wget https://nginx.org/download/$NGINX_VERSION.tar.gz && \
     wget https://www.openssl.org/source/$OPENSSL_VERSION.tar.gz && tar -xf $NGINX_VERSION.tar.gz && \
@@ -16,9 +15,7 @@ RUN wget https://nginx.org/download/$NGINX_VERSION.tar.gz && \
     --with-http_v2_module --with-http_ssl_module --with-http_gzip_static_module \
     --sbin-path=/usr/bin/nginx && make -j 2 && make install && cd .. && rm -r $NGINX_VERSION* && rm -r $OPENSSL_VERSION*
 # Adding Files
-RUN mkdir healthchecks
 COPY healthchecks/nginx.py nginx.py
-COPY conf/nginx.conf /etc/nginx/nginx.conf
 # Volumes
 VOLUME /var/log/nginx
 # Opening Ports

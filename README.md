@@ -10,7 +10,6 @@ A Project Containing Telegram API bots and small web apps .
    - `persianmeme_channel`: Persian Meme voting channel ID
    - `secret_key`: Django secret key
    - `db_password`: Database password
-   - `persianmeme_anim`: Persian Meme help GIF file ID
    - `persianmeme_logs`: Persian Meme logging channel ID
    - `persianmeme_messages`: "Contact Admin" archive channel ID
    - `persianmeme_reports`: Meme Report archive channel ID
@@ -18,6 +17,7 @@ A Project Containing Telegram API bots and small web apps .
    - `ssl_key`: SSL private key
    - `dhparam`: SSL dhparam
    - `domain`: Your Domain
+   - `webhook_token`: Security token which Telegram will include in its webhook requests headers
    - `persianmeme_help_messages`: A JSON file containing help messages and animations
 4. Replace {persianmeme_token} & {domain} inside conf/nginx.conf with
    your domain and bot token
@@ -29,7 +29,7 @@ A Project Containing Telegram API bots and small web apps .
 Docker swarm secrets: https://docs.docker.com/engine/swarm/secrets/**
 - In order to update your stack use this command:
 
-    `docker stack deploy -c docker-compose.yml {stack name}`
+    `docker stack deploy -c docker-compose.yml --with-registry-auth {stack name}`
 # Developers
 Created by NitroZeus and RezFD
       

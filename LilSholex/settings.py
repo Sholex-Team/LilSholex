@@ -35,7 +35,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'persianmeme.apps.PersianmemeConfig',
+    'persianmeme.apps.PersianmemeConfig'
 ]
 
 MIDDLEWARE = [
@@ -74,6 +74,8 @@ with open(SECRETS_PATH / 'db_password') as db_password:
         'default': {
             'ENGINE': 'django.db.backends.mysql',
             'NAME': 'lilsholex',
+            'CONN_MAX_AGE': 28780,
+            'CONN_HEALTH_CHECKS': True,
             'USER': 'sholex',
             'PASSWORD': db_password.read().removesuffix('\n'),
             'HOST': 'db',
@@ -120,7 +122,6 @@ USE_TZ = False
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'static'
-MAX_ATTEMPTS = 2
 
 # Pagination Limit Broadcast
 PAGINATION_LIMIT = 1500
@@ -139,6 +140,9 @@ CACHES = {
         'LOCATION': 'memcached:11211'
     }
 }
+TELEGRAM_HEADER_NAME = 'HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'
+with open(SECRETS_PATH / 'webhook_token') as webhook_token_file:
+    WEBHOOK_TOKEN = webhook_token_file.read().removesuffix('\n')
 SPAM_COUNT = 10
 SPAM_TIME = 5
 SPAM_PENALTY = 1800
@@ -148,6 +152,7 @@ VIDEO_SIZE_LIMIT = 20971520
 # Celery
 CELERY_BROKER_URL = 'amqp://guest:guest@rabbitmq:5672/'
 CELERY_WORKER_STATE_DB = str(BASE_DIR / 'state' / 'celery_state')
+CELERY_ACKS_LATE = True
 REVOKE_REVIEW_COUNTDOWN = 3600
 CHECK_MEME_COUNTDOWN = 21600
 # CSRF

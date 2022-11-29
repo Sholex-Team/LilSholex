@@ -1,5 +1,5 @@
 from django.urls import path
-from persianmeme import views
-from django.conf import settings
+from . import views
+
 app_name = 'persianmeme'
-urlpatterns = (path(settings.MEME + '/', views.webhook_wrapper),)
+urlpatterns = (path('', views.webhook_wrapper),)

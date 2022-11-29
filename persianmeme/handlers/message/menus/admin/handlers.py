@@ -25,7 +25,8 @@ from .menus import (
     edit_meme_name,
     edit_meme_tags,
     edit_meme_tags_and_description,
-    edit_meme_description
+    edit_meme_description,
+    edit_meme_file
 )
 
 
@@ -81,6 +82,8 @@ def handler(message: dict, text: str, message_id: int, user: UserClass):
                 text, message_id, user.database.current_meme.type
         ):
             edit_meme_description.handler(text, user)
+        case User.Menu.ADMIN_EDIT_MEME_FILE:
+            edit_meme_file.handler(message, user)
         case User.Menu.ADMIN_FILE_ID:
             file_id.handler(message, message_id, user)
         case User.Menu.ADMIN_MEME_REVIEW:

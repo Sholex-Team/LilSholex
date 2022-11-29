@@ -53,7 +53,7 @@ def count_reporters(obj: models.Report):
 class User(admin.ModelAdmin):
     @admin.display(description='Ban')
     def ban_user(self, request: HttpRequest, queryset):
-        result = queryset.update(status='b')
+        result = queryset.update(status=models.User.Status.BANNED)
         if result == 0:
             self.message_user(request, 'There is no need to banned these users !')
         elif result == 1:
@@ -63,7 +63,7 @@ class User(admin.ModelAdmin):
 
     @admin.display(description='Full Ban')
     def full_ban(self, request: HttpRequest, queryset):
-        result = queryset.update(status='f')
+        result = queryset.update(status=models.User.Status.FULL_BANNED)
         if result == 0:
             self.message_user(request, 'There is no need to full banned these users !')
         elif result == 1:
@@ -73,7 +73,7 @@ class User(admin.ModelAdmin):
 
     @admin.display(description='Unban')
     def unban_user(self, request: HttpRequest, queryset):
-        result = queryset.update(status='a')
+        result = queryset.update(status=models.User.Status.ACTIVE)
         if result == 0:
             self.message_user(request, 'There is no need to unbanned these users !')
         elif result == 1:
@@ -88,18 +88,17 @@ class User(admin.ModelAdmin):
     list_display = (
         'user_id',
         'chat_id',
-        'menu',
+        'last_usage_date',
         'rank',
         'status',
         'date',
-        'username',
         'menu_mode'
     )
     list_filter = (
         'status', 'rank', 'vote', 'started', 'meme_ordering', 'menu_mode', 'use_recent_memes', 'search_items'
     )
     list_per_page = 15
-    search_fields = ('user_id', 'chat_id', 'username')
+    search_fields = ('user_id', 'chat_id')
     readonly_fields = ('user_id', 'date', 'last_usage_date')
     actions = (unban_user, full_ban, ban_user, export_json)
     raw_id_fields = (
@@ -113,7 +112,7 @@ class User(admin.ModelAdmin):
     )
     fieldsets = (
         ('Information', {'fields': (
-            'user_id', 'chat_id', 'rank', 'vote', 'username', 'date', 'meme_ordering', 'search_items'
+            'user_id', 'chat_id', 'rank', 'vote', 'date', 'meme_ordering', 'search_items'
         )}),
         ('Status', {'fields': (
             'menu',
@@ -183,15 +182,27 @@ class Meme(admin.ModelAdmin):
         else:
             self.message_user(request, f'{recovered_memes_count} memes have been recovered.')
 
+    @admin.display(description='Ban Senders')
+    def ban_senders(self, request: HttpRequest, queryset):
+        if not (banned_senders_count := models.User.objects.filter(user_id__in=tuple(queryset.filter(
+                sender__status=models.User.Status.ACTIVE
+        ).values_list('sender', flat=True).distinct())).update(status=models.User.Status.BANNED)):
+            self.message_user(request, 'There isn\'t any sender to ban !')
+        elif banned_senders_count == 1:
+            self.message_user(request, 'One sender has been banned.')
+        else:
+            self.message_user(request, f'{banned_senders_count} senders have been banned.')
+
     add_fake_deny_votes.allowed_permissions = change_permission
     recover_memes.allowed_permissions = change_permission
+    ban_senders.allowed_permissions = change_permission
     date_hierarchy = 'date'
     list_display = (
         'id', 'name', 'sender', 'type', 'status', 'usage_count', count_deny_votes, count_accept_votes, count_tags
     )
     list_filter = ('status', 'visibility', 'reviewed', 'type', 'previous_status')
     search_fields = ('name', 'sender__chat_id', 'file_id', 'file_unique_id', 'id', 'sender__user_id', 'description')
-    actions = (export_json, accept_vote, deny_vote, add_fake_deny_votes, recover_memes)
+    actions = (export_json, accept_vote, deny_vote, add_fake_deny_votes, recover_memes, ban_senders)
     list_per_page = 15
     readonly_fields = ('id', 'date')
     raw_id_fields = ('sender', 'voters', 'accept_vote', 'deny_vote', 'tags', 'assigned_admin')
@@ -239,7 +250,7 @@ class Delete(admin.ModelAdmin):
     list_display = ('id', 'meme', 'user')
     readonly_fields = ('id',)
     search_fields = (
-        'id', 'user__username', 'user__chat_id', 'meme__id', 'meme__file_id', 'meme__file_unique_id'
+        'id', 'user__user_id', 'user__chat_id', 'meme__id', 'meme__file_id', 'meme__file_unique_id'
     )
     raw_id_fields = ('meme', 'user')
     fieldsets = (('Information', {'fields': ('id', 'meme', 'user')}),)
@@ -249,7 +260,7 @@ class Delete(admin.ModelAdmin):
 class Broadcast(admin.ModelAdmin):
     list_display = ('id', 'message_id', 'sender', 'sent')
     list_filter = ('sent',)
-    search_fields = ('id', 'message_id', 'sender__chat_id', 'sender__username')
+    search_fields = ('id', 'message_id', 'sender__chat_id', 'sender__user_id')
     list_per_page = 15
     readonly_fields = ('id',)
     raw_id_fields = ('sender',)
@@ -261,7 +272,7 @@ class Playlist(admin.ModelAdmin):
     list_display = ('id', 'name', count_voices, 'creator', 'date')
     date_hierarchy = 'date'
     list_filter = ('creator__rank', 'creator__status')
-    search_fields = ('name', 'id', 'creator__username', 'creator__chat_id')
+    search_fields = ('name', 'id', 'creator__user_id', 'creator__chat_id')
     list_per_page = 15
     readonly_fields = ('id', 'date')
     raw_id_fields = ('voices', 'creator')
@@ -273,7 +284,7 @@ class Message(admin.ModelAdmin):
     list_display = ('id', 'sender', 'status')
     list_filter = ('status',)
     raw_id_fields = ('sender',)
-    search_fields = ('id', 'sender__username', 'sender__user_id', 'sender__chat_id')
+    search_fields = ('id', 'sender__user_id', 'sender__user_id', 'sender__chat_id')
     list_per_page = 15
     readonly_fields = ('id',)
     fieldsets = (('Information', {'fields': ('id', 'sender')}), ('Status', {'fields': ('status',)}))
@@ -288,19 +299,15 @@ class MemeTag(admin.ModelAdmin):
 
 
 @admin.register(models.RecentMeme)
-class RecentMemes(admin.ModelAdmin):
+class RecentMeme(admin.ModelAdmin):
     raw_id_fields = ('user', 'meme')
     readonly_fields = ('id',)
     list_display = ('id', 'user', 'meme')
     list_per_page = 30
     search_fields = (
         'id',
-        'user__username',
-        'user__chat_id',
         'user__user_id',
-        'meme__id',
-        'meme__file_unique_id',
-        'meme__file_id'
+        'meme__id'
     )
     fieldsets = (('Information', {'fields': ('id', 'user', 'meme')}),)
 
@@ -313,7 +320,7 @@ class Report(admin.ModelAdmin):
     search_fields = (
         'reporters__user_id',
         'reporters__chat_id',
-        'reporters__username',
+        'reporters__user',
         'meme__id',
         'meme__name',
         'meme__file_id',
@@ -321,3 +328,14 @@ class Report(admin.ModelAdmin):
     )
     raw_id_fields = ('meme', 'reporters')
     fieldsets = (('Information', {'fields': ('meme', 'reporters')}), ('Status', {'fields': ('status',)}))
+
+
+@admin.register(models.Username)
+class Username(admin.ModelAdmin):
+    list_display = ('id', 'user', 'username', 'creation_date')
+    date_hierarchy = 'creation_date'
+    search_fields = ('user__chat_id', 'user__user_id', 'username')
+    list_per_page = 30
+    raw_id_fields = ('user',)
+    readonly_fields = ('id', 'creation_date')
+    fieldsets = (('Information', {'fields': ('id', 'user', 'username', 'creation_date')}),)

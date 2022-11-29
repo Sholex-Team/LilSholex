@@ -6,6 +6,11 @@ from persianmeme.classes import User as UserClass
 
 def handler(text: str, message_id: int, user: UserClass):
     match text:
+        case 'Edit File':
+            user.database.back_menu = 'edit_voice' if user.database.current_meme.type \
+                                                      == MemeType.VOICE else 'edit_video'
+            user.database.menu = User.Menu.ADMIN_EDIT_MEME_FILE
+            user.send_message(user.translate('edit_meme_file', user.current_meme_translation), en_back)
         case 'Edit Name':
             user.database.back_menu = 'edit_voice' if user.database.current_meme.type \
                                                       == MemeType.VOICE else 'edit_video'

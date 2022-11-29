@@ -2,14 +2,18 @@ import json
 from time import time
 from django.conf import settings
 from django.core.cache import cache
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseForbidden
+from django.views.decorators.http import require_POST
 from requests import Session as RequestSession
 from .handlers import inline_query_handlers, chosen_inline_result_handlers, callback_query_handlers, message_handlers
 from persianmeme import models
 from LilSholex.exceptions import RequestInterruption
 
 
+@require_POST
 def webhook(request):
+    if request.META.get(settings.TELEGRAM_HEADER_NAME) != settings.WEBHOOK_TOKEN:
+        return HttpResponseForbidden()
     update = json.loads(request.body.decode())
     match update:
         case {'chosen_inline_result': chat_id_result}:

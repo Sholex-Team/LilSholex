@@ -66,13 +66,13 @@ manage_voice = {'keyboard': [['حذف ویس ❌', 'گوش دادن به ویس 
 manage_video = {'keyboard': [['حذف ویدئو ❌', 'تماشای ویدئو 👁'], ['بازگشت 🔙']], 'resize_keyboard': True}
 edit_meme = {'keyboard': [
     ['Edit Name', 'Edit Tags', 'Check the Meme'],
-    ['Edit Tags & Description'],
+    ['Edit File', 'Edit Tags & Description'],
     ['Edit Description'],
     ['Done ✔'],
     ['Back 🔙']
 ], 'resize_keyboard': True}
 meme_review = {'keyboard': [
-    ['Edit Name', 'Edit Tags'],
+    ['Edit File', 'Edit Name', 'Edit Tags'],
     ['Edit Tags & Description'],
     ['Edit Description'],
     ['Delete 🗑', 'Check the Meme'],

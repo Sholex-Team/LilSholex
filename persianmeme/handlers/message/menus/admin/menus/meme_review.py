@@ -7,6 +7,10 @@ from persianmeme.translations import admin_messages
 def handler(text: str, message_id: int, user: UserClass):
     if user.check_current_meme():
         match text:
+            case 'Edit File':
+                user.database.back_menu = 'meme_review'
+                user.database.menu = User.Menu.ADMIN_EDIT_MEME_FILE
+                user.send_message(admin_messages['edit_meme_file'].format(user.current_meme_translation), en_back)
             case 'Edit Name':
                 user.database.back_menu = 'meme_review'
                 user.database.menu = User.Menu.ADMIN_EDIT_MEME_NAME

@@ -25,7 +25,7 @@ admin_messages = {
     'meme_not_found': 'I could not find this {0} ☹',
     'unknown_command': 'Unknown Command ⚠',
     'meme_added': '{0} has been added to database ✅',
-    'meme_already_exists': '{0} already exists in the database ❌',
+    'meme_already_exists': 'Meme already exists in the database ❌',
     'invalid_user_id': 'User ID is not valid ⚠',
     'unbanned': 'User has been unbanned ☑',
     'message': 'Please send the messages.',
@@ -63,14 +63,16 @@ admin_messages = {
     'edit_meme': 'Use one of these options to edit the {0} 👇',
     'edit_meme_name': 'Send the new name of the {0}.',
     'edit_meme_tags': 'Send the new {0} tags.',
+    'edit_meme_file': 'Send the new {0} file.',
     'edit_meme_description': 'Send the new {0} description.',
     'meme_name_edited': '{0} name has been edited ✔️',
     'meme_tags_edited': '{0} tags have been edited ✔️',
     'meme_description_edited': '{0} description has been edited ✔',
     'meme_tags_and_description_edited': '{0} tags and description have been edited ✔',
+    'meme_file_edited': '{0} file has been edited ✔',
     'invalid_meme_name': '{0} name is invalid ⚠️',
     'send_document': 'Send a document to get it\'s file ID.',
-    'file_id': 'Here is the document file ID 👇\n\n{0}',
+    'file_id': 'Here is the document file ID 👇\n\n<code>{0}</code>\n\n<code>{1}</code>',
     'no_document': 'Your message does not contain any document !',
     'start_the_bot': 'In order to use the bot, click here ✅',
     'add_meme': 'Add a Meme',
@@ -104,10 +106,6 @@ user_messages = {
     'vote_before': 'شما قبلا به این {0} رای داده اید ⚠️\nنتایج هر ۳ دقیقه به روزرسانی می شوند 🔄',
     'voted': 'رای شما ثبت شد ✔️',
     'donate': '''برای حمایت مالی از ما می توانید از روش های زیر استفاده کنید 👇
-
-    PayPing : https://payping.ir/RezFD
-
-    IDPay : https://idpay.ir/persianmeme
     
     TON : `EQACYOxZgT94vwSqUq77YJzLCRKxA7JW4W60AM8ZT3k6_eG5`
 
@@ -146,8 +144,8 @@ user_messages = {
     'meme_not_found': 'نتونستم این {0} رو پیدا کنم ☹',
     'message_sent': 'پیام شما به مدیریت ارسال شد ✔',
     'invalid_meme_name': 'نام {0} معتبر نیست ❌\nنام باید متن ساده و حداکثر ۸۰ کارکتر باشد !',
-    'meme_added': '{0} شما برای تایید به کانال رای گیری ارسال شد 👇\n🆔 @PersianMemeVoting',
-    'meme_already_exists': 'این {0} در ربات موجود میباشد ⚠',
+    'meme_added': '{0} شما برای تایید به کانال رای گیری ارسال شد 👇\n🆔 @PersianMemeOfficial',
+    'meme_already_exists': 'این میم در ربات موجود میباشد ⚠',
     'meme_deleted': '{0} شما با موفقیت حذف شد 🗑',
     'meme_is_not_yours': '{0} متعلق به شما نبوده و یا در ربات موجود نمیباشد ❌',
     'voting_on': 'سیستم امتیازدهی برای شما روشن شد 🔛',

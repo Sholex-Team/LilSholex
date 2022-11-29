@@ -279,7 +279,7 @@ class User(Base):
     def set_username(self):
         username = self.get_chat().get('username')
         if username:
-            self.database.username = '@' + username
+            self.database.usernames.get_or_create(username=username.lower())
 
     def like_meme(self, target_voice: models.Meme):
         if self.database in target_voice.accept_vote.all():
@@ -337,10 +337,7 @@ class User(Base):
                 Q(visibility=models.Meme.Visibility.NORMAL) |
                 (Q(visibility=models.Meme.Visibility.PRIVATE) & Q(sender=self.database))
         )).exists():
-            self.send_message(
-                self.translate('meme_already_exists', self.translate('voice')),
-                reply_to_message_id=message['message_id']
-            )
+            self.send_message(self.translate('meme_already_exists'), reply_to_message_id=message['message_id'])
             return False
         models.Meme.objects.create(
             file_id=message['voice']['file_id'],
@@ -404,11 +401,6 @@ class User(Base):
             return True
         self.send_message(self.translate('send_a_meme', self.translate('voice')))
 
-    def video_exists(self, message: dict):
-        if check_for_video(message):
-            return True
-        self.send_message(self.translate('send_a_meme', self.translate('video')))
-
     def get_playlists(self, page: int):
         return paginate(models.Playlist.objects.filter(creator=self.database), page)
 
@@ -466,7 +458,7 @@ class User(Base):
                 status=models.Meme.Status.PENDING,
                 type=models.MemeType.VOICE
             )
-        elif matched := check_for_video(message):
+        elif matched := check_for_video(message, True):
             target_vote = models.Meme.objects.filter(
                 file_unique_id=message['video']['file_unique_id'],
                 status=models.Meme.Status.PENDING,
@@ -535,34 +527,46 @@ class User(Base):
     def clear_temp_meme_tags(self):
         self.database.temp_meme_tags.clear()
 
-    def add_meme(self, message: dict, status: models.Meme.Status):
-        if self.database.temp_meme_type == models.MemeType.VOICE:
+    def initial_meme_check(self, message: dict, meme_type: models.MemeType or int):
+        if meme_type == models.MemeType.VOICE:
             if not self.voice_exists(message):
                 return False
-            file_id = message['voice']['file_id']
-            file_unique_id = message['voice']['file_unique_id']
+            initial_check_result = message['voice']['file_id'], message['voice']['file_unique_id']
         else:
-            if not self.video_exists(message):
+            if not check_for_video(message, self.database.rank in models.BOT_ADMINS):
+                self.send_message(self.translate('send_a_meme', self.translate('video')))
                 return False
-            file_id = message['video']['file_id']
-            file_unique_id = message['video']['file_unique_id']
-        if not models.Meme.objects.filter(
-                file_unique_id=file_unique_id, visibility=models.Meme.Visibility.NORMAL
+            initial_check_result = message['video']['file_id'], message['video']['file_unique_id']
+        if models.Meme.objects.filter(
+                file_unique_id=initial_check_result[1], visibility=models.Meme.Visibility.NORMAL
         ).exists():
-            new_meme = models.Meme.objects.create(
-                file_id=file_id,
-                file_unique_id=file_unique_id,
-                name=self.database.temp_meme_name,
-                sender=self.database,
-                status=status,
-                type=self.database.temp_meme_type,
-                description=create_description(self.database.temp_meme_tags.all()) if
-                self.database.temp_meme_type == models.MemeType.VIDEO else None
-            )
-            new_meme.tags.set(self.database.temp_meme_tags.all(), clear=True)
-            self.database.temp_meme_tags.clear()
-            return new_meme
-        self.send_message(self.translate('meme_already_exists', self.temp_meme_translation))
+            self.send_message(self.translate('meme_already_exists'))
+            return False
+        return initial_check_result
+
+    def edit_meme_file(self, message: dict):
+        if not (initial_check_result := self.initial_meme_check(message, self.database.current_meme.type)):
+            return False
+        self.database.current_meme.file_id, self.database.current_meme.file_unique_id = initial_check_result
+        self.database.current_meme.save()
+        return True
+
+    def add_meme(self, message: dict, status: models.Meme.Status):
+        if not (initial_check_result := self.initial_meme_check(message, self.database.temp_meme_type)):
+            return False
+        new_meme = models.Meme.objects.create(
+            file_id=initial_check_result[0],
+            file_unique_id=initial_check_result[1],
+            name=self.database.temp_meme_name,
+            sender=self.database,
+            status=status,
+            type=self.database.temp_meme_type,
+            description=create_description(self.database.temp_meme_tags.all()) if
+            self.database.temp_meme_type == models.MemeType.VIDEO else None
+        )
+        new_meme.tags.set(self.database.temp_meme_tags.all(), clear=True)
+        self.database.temp_meme_tags.clear()
+        return new_meme
 
     def validate_meme_name(self, message: dict, text: str, meme_type: models.MemeType or int):
         if not text or \
@@ -586,7 +590,7 @@ class User(Base):
         return True
 
     def get_public_meme(self, message):
-        if matched := check_for_video(message):
+        if matched := check_for_video(message, True):
             file_unique_id = message['video']['file_unique_id']
             meme_type = models.MemeType.VIDEO
             meme_translation = self.translate('video')
