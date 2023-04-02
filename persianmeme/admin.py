@@ -49,6 +49,18 @@ def count_reporters(obj: models.Report):
     return obj.reporters.count()
 
 
+class UsernameInline(admin.TabularInline):
+    extra = 0
+    model = models.Username
+    readonly_fields = ('creation_date',)
+
+
+class RecentMemeInline(admin.TabularInline):
+    extra = 0
+    model = models.RecentMeme
+    raw_id_fields = ('meme',)
+
+
 @admin.register(models.User)
 class User(admin.ModelAdmin):
     @admin.display(description='Ban')
@@ -131,6 +143,7 @@ class User(admin.ModelAdmin):
         ('Memes', {'fields': ('playlists',)}),
         ('Temporary Values', {'fields': ('temp_meme_name', 'temp_user_id', 'temp_meme_tags')})
     )
+    inlines = (UsernameInline, RecentMemeInline)
 
 
 @admin.register(models.Meme)

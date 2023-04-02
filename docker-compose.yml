@@ -1,7 +1,7 @@
 version: "3.8"
 services:
   db:
-    image: mysql:8.0.31
+    image: mysql:8.0.32
     command: --default-authentication-plugin=mysql_native_password
     environment:
         MYSQL_ROOT_PASSWORD_FILE: "/run/secrets/db_password"
@@ -48,7 +48,7 @@ services:
       - source: mysql_2
         target: /etc/mysql/conf.d/mysql.cnf
   rabbitmq:
-    image: rabbitmq:3.11.2
+    image: rabbitmq:3.11.10
     healthcheck:
       test: "rabbitmq-diagnostics -q ping"
       interval: 10s
@@ -87,7 +87,7 @@ services:
       - source: rabbitmq
         target: /etc/rabbitmq/rabbitmq.conf
   nginx:
-    image: ghcr.io/sholex-team/nginx:4.0
+    image: ghcr.io/sholex-team/nginx:4.1
     networks:
       - nginx_lilsholex
     ports:
@@ -145,7 +145,7 @@ services:
       - ssl_key
       - dhparam
   lilsholex:
-    image: ghcr.io/sholex-team/lilsholex:5.5
+    image: ghcr.io/sholex-team/lilsholex:5.6
     networks:
       - db_django
       - nginx_lilsholex
@@ -197,7 +197,7 @@ services:
         window: 10s
         delay: 5s
   celery: &celery_base
-    image: ghcr.io/sholex-team/lilsholex:5.5
+    image: ghcr.io/sholex-team/lilsholex:5.6
     command: "celery -A LilSholex worker -Q celery -l info -c 2 -E"
     networks:
       - db_django
@@ -259,7 +259,7 @@ services:
         - internet
         - tasks_django
   lilsholex_broadcasts:
-    image: ghcr.io/sholex-team/lilsholex:5.5
+    image: ghcr.io/sholex-team/lilsholex:5.6
     command: "python manage.py process_broadcasts"
     networks:
       - db_django
@@ -301,7 +301,7 @@ services:
         window: 10s
         delay: 5s
   memcached:
-    image: memcached:1.6.17
+    image: memcached:1.6.19
     command: "memcached -m 256"
     networks:
       - cache_django
@@ -330,7 +330,7 @@ services:
         monitor: 10s
         order: start-first
   lilsholex_migrations:
-    image: ghcr.io/sholex-team/lilsholex:5.5
+    image: ghcr.io/sholex-team/lilsholex:5.6
     command: "bash -c 'yes | python manage.py makemigrations persianmeme && \
     yes | python manage.py migrate && python manage.py collectstatic --noinput'"
     secrets:
