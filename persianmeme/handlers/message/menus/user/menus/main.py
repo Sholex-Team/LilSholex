@@ -18,12 +18,10 @@ def handler(message: dict, text: str, message_id: int, user: UserClass):
         case 'گزارش تخلف 🛑':
             user.database.menu = User.Menu.USER_REPORT_MEME
             user.send_message(user_messages['send_target_meme'], keyboards.per_back, message_id)
-        case 'دیسکورد':
-            user.send_message(user.translate('discord'), keyboards.discord, message_id)
         case 'حمایت مالی 💸':
             user.send_message(user.translate('donate'), reply_to_message_id=message_id, parse_mode='Markdown')
-        case 'گروه عمومی':
-            user.send_message(user.translate('group'), keyboards.group, message_id)
+        case 'کانال رای‌گیری 🗳':
+            user.send_message(user.translate('voting_channel'), keyboards.voting_channel, message_id)
         case 'آخرین میم ها 🆕':
             user.send_ordered_meme_list(user.database.Ordering.new_meme_id)
         case 'ارتباط با مدیریت 📬':

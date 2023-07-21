@@ -1,6 +1,8 @@
+from django.conf import settings
 from LilSholex.exceptions import RequestInterruption
 from persianmeme.classes import User
 from persianmeme.functions import answer_inline_query
+from persianmeme.models import User as UserClass
 from json import dumps
 
 
@@ -24,8 +26,15 @@ def handler(request, inline_query, user_chat_id):
     user.send_ad()
     user.set_username()
     user.database.save()
-    if user.database.status != 'f':
-        results, next_offset = user.get_memes(query, offset)
+    if user.database.status != UserClass.Status.FULL_BANNED:
+        if len((splinted_query := query.split(settings.SEARCH_CAPTION_KEY, 1))) == 2:
+            query, caption = splinted_query
+        elif query.startswith(settings.EMPTY_CAPTION_KEY):
+            caption = query.removeprefix(settings.EMPTY_CAPTION_KEY)
+            query = str()
+        else:
+            caption = None
+        results, next_offset = user.get_memes(query, offset, caption)
         answer_inline_query(
             inline_query_id,
             dumps(results),

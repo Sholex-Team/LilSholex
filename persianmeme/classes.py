@@ -178,12 +178,12 @@ class User(Base):
                 return Q(type__in=(types_tuple := (models.MemeType.VOICE, models.MemeType.VIDEO))), \
                        Q(meme__type__in=types_tuple)
 
-    def get_memes(self, query: str, offset: str):
-        if query.startswith('names:'):
+    def get_memes(self, query: str, offset: str, caption: str | None):
+        if query.startswith(settings.NAMES_KEY):
             query = query[6:].strip()
             queries = Q(name__icontains=query)
             type_filter, recent_type_filter = self.__search_items
-        elif query.startswith('id:') and (target_voice_id := query[3:].strip()).isdigit():
+        elif query.startswith(settings.ID_KEY) and (target_voice_id := query[3:].strip()).isdigit():
             result_maker = make_meme_like_result if self.database.vote else make_meme_result
             try:
                 return ([result_maker(models.Meme.objects.get(
@@ -192,19 +192,19 @@ class User(Base):
                                                      Q(sender=self.database)
                                              ) | Q(visibility=models.Meme.Visibility.NORMAL)) & Q(
                         status=models.Meme.Status.ACTIVE)
-                ))], str())
+                ), caption)], str())
             except (models.Meme.DoesNotExist, ValueError):
                 return list(), str()
         else:
-            if is_tags := query.startswith('tags:'):
+            if is_tags := query.startswith(settings.TAGS_KEY):
                 query = query[5:].strip()
                 type_filter, recent_type_filter = self.__search_items
             else:
-                if query.startswith('voices:'):
+                if query.startswith(settings.VOICES_KEY):
                     query = query[7:].strip()
                     type_filter = Q(type=models.MemeType.VOICE)
                     recent_type_filter = Q(meme__type=models.MemeType.VOICE)
-                elif query.startswith('videos:'):
+                elif query.startswith(settings.VIDEOS_KEY):
                     query = query[7:].strip()
                     type_filter = Q(type=models.MemeType.VIDEO)
                     recent_type_filter = Q(meme__type=models.MemeType.VIDEO)
@@ -249,7 +249,7 @@ class User(Base):
             if splinted_offset[current_offset] != 'e':
                 splinted_offset[current_offset] = int(splinted_offset[current_offset])
                 current_result = result()[splinted_offset[current_offset]:splinted_offset[current_offset] + remaining]
-                temp_result = [result_maker(meme) for meme in current_result
+                temp_result = [result_maker(meme, caption) for meme in current_result
                                if all(meme[0] != target_result['id'] for target_result in results)]
                 if not (temp_len := len(temp_result)):
                     splinted_offset[current_offset] = 'e'

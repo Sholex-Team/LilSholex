@@ -10,6 +10,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRETS_PATH = Path('/run/secrets')
 with open(SECRETS_PATH / 'secret_key') as secret_file:
     SECRET_KEY = secret_file.read().removesuffix('\n')
+
+# PersianMeme
 with open(SECRETS_PATH / 'persianmeme_token') as persian_meme_token:
     MEME = persian_meme_token.read().removesuffix('\n')
 with open(SECRETS_PATH / 'persianmeme_channel') as persian_meme_channel:
@@ -22,6 +24,14 @@ with open(SECRETS_PATH / 'persianmeme_help_messages') as persian_meme_help_messa
     MEME_HELP_MESSAGES = persian_meme_help_messages.read()
 with open(SECRETS_PATH / 'persianmeme_reports') as persian_meme_reports:
     MEME_REPORTS_CHANNEL = persian_meme_reports.read().removesuffix('\n')
+ID_KEY = 'id:'
+EMPTY_CAPTION_KEY = '@ '
+SEARCH_CAPTION_KEY = ' @ '
+NAMES_KEY = 'names:'
+TAGS_KEY = 'tags:'
+VOICES_KEY = 'voices:'
+VIDEOS_KEY = 'videos:'
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 with open(SECRETS_PATH / 'domain') as domain_file:

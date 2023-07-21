@@ -1,5 +1,5 @@
 from django.contrib import admin
-from persianmeme import models
+from . import models
 from django.http import HttpResponse, HttpRequest
 from django.core.serializers import serialize
 from .functions import fake_deny_vote
@@ -297,7 +297,7 @@ class Message(admin.ModelAdmin):
     list_display = ('id', 'sender', 'status')
     list_filter = ('status',)
     raw_id_fields = ('sender',)
-    search_fields = ('id', 'sender__user_id', 'sender__user_id', 'sender__chat_id')
+    search_fields = ('id', 'sender__user_id', 'sender__chat_id')
     list_per_page = 15
     readonly_fields = ('id',)
     fieldsets = (('Information', {'fields': ('id', 'sender')}), ('Status', {'fields': ('status',)}))

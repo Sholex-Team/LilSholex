@@ -143,46 +143,68 @@ async def perform_broadcast(broadcast: Broadcast):
                 await asyncio.sleep(0.7)
 
 
-def make_result(meme: list):
+def make_result(meme: list, caption: str | None):
     temp_result = {
-        'id': meme[0],
-        'title': meme[2]
+        'id': meme[0]
     }
     if meme[3] == models.MemeType.VIDEO:
         temp_result['type'] = 'video'
         temp_result['video_file_id'] = meme[1]
-        temp_result['description'] = meme[4]
+        temp_result['title'] = meme[2]
+        if caption:
+            temp_result['caption'] = f'<b>{caption}</b>'
+            temp_result['parse_mode'] = 'HTML'
+            temp_result['description'] = caption
+        else:
+            temp_result['description'] = meme[4]
     else:
         temp_result['type'] = 'voice'
         temp_result['voice_file_id'] = meme[1]
+        if caption:
+            temp_result['caption'] = f'<b>{caption}</b>'
+            temp_result['parse_mode'] = 'HTML'
+            temp_result['title'] = f'{meme[2]} ({caption})'
+        else:
+            temp_result['title'] = meme[2]
     return temp_result
 
 
-def make_like_result(meme: list):
-    temp_result = make_result(meme)
+def make_like_result(meme: list, caption: str | None):
+    temp_result = make_result(meme, caption)
     temp_result['reply_markup'] = {'inline_keyboard': [[
         {'text': '👍', 'callback_data': f'up:{meme[0]}'}, {'text': '👎', 'callback_data': f'down:{meme[0]}'}
     ]]}
     return temp_result
 
 
-def make_meme_result(meme: models.Meme):
+def make_meme_result(meme: models.Meme, caption: str | None):
     temp_result = {
-        'id': meme.id,
-        'title': meme.name
+        'id': meme.id
     }
     if meme.type == models.MemeType.VIDEO:
         temp_result['type'] = 'video'
         temp_result['video_file_id'] = meme.file_id
-        temp_result['description'] = meme.description
+        temp_result['title'] = meme.name
+        if caption:
+            temp_result['caption'] = f'<b>{caption}</b>'
+            temp_result['parse_mode'] = 'HTML'
+            temp_result['description'] = caption
+        else:
+            temp_result['description'] = temp_result['description'] = meme.description
     else:
         temp_result['type'] = 'voice'
         temp_result['voice_file_id'] = meme.file_id
+        if caption:
+            temp_result['caption'] = f'<b>{caption}</b>'
+            temp_result['parse_mode'] = 'HTML'
+            temp_result['title'] = f'{meme.name} ({caption})'
+        else:
+            temp_result['title'] = meme.name
     return temp_result
 
 
-def make_meme_like_result(meme: models.Meme):
-    temp_result = make_meme_result(meme)
+def make_meme_like_result(meme: models.Meme, caption: str | None):
+    temp_result = make_meme_result(meme, caption)
     temp_result['reply_markup'] = {'inline_keyboard': [[
         {'text': '👍', 'callback_data': f'up:{meme.id}'}, {'text': '👎', 'callback_data': f'down:{meme.id}'}
     ]]}
