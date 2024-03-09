@@ -35,6 +35,6 @@ Created by NitroZeus and RezFD
       
 - Telegram: [@SholexTeam](https://t.me/SholexTeam)
 - GitHub: [@RealNitroZeus](https://github.com/RealNitroZeus) - [@RezFD](https://github.com/RezFD)
-- Email: [NitroZeus](mailto:NitroZeus@sholexteam.ir) - [RezFD](mailto:RezFD@sholexteam.ir)
+- Email: [NitroZeus](mailto:NitroZeus@sholex.team) - [RezFD](mailto:rez@sholex.team)
 
 SholexTeam &reg;
