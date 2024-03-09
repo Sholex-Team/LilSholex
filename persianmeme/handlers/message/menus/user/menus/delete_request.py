@@ -8,7 +8,6 @@ from persianmeme.keyboards import user as user_keyboard
 def handler(message_id: int, target_meme: Meme, user: UserClass):
     owner = classes.User(
         user.session,
-        classes.User.Mode.NORMAL,
         instance=User.objects.filter(rank='o').first()
     )
     user.database.menu = User.Menu.USER_MAIN

@@ -7,9 +7,7 @@ from LilSholex.exceptions import RequestInterruption
 def handler(command: str, target_id: int, message_id: int, query_id: str, answer_query, inliner: User):
     if not (target_delete := get_delete(target_id)):
         raise RequestInterruption()
-    user = User(
-        inliner.session, User.Mode.NORMAL, instance=target_delete.user
-    )
+    user = User(inliner.session, instance=target_delete.user)
     if command == 'delete':
         target_delete.meme.delete()
         answer_query(query_id, translations.admin_messages['deleted'], True)

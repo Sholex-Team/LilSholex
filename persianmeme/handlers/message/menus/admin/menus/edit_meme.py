@@ -25,7 +25,7 @@ def handler(text: str, message_id: int, user: UserClass):
             user.send_message(user.translate(
                 'edit_meme_tags', user.current_meme_translation
             ), en_back)
-        case 'Edit Tags & Description' if user.database.current_meme.type == MemeType.VIDEO:
+        case 'Edit Tags &amp; Description' if user.database.current_meme.type == MemeType.VIDEO:
             user.database.back_menu = 'edit_voice' if user.database.current_meme.type \
                                                       == MemeType.VOICE else 'edit_video'
             user.database.menu = User.Menu.ADMIN_EDIT_MEME_TAGS_AND_DESCRIPTION

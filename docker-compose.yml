@@ -1,8 +1,7 @@
 version: "3.8"
 services:
   db:
-    image: mysql:8.0.33
-    command: --default-authentication-plugin=mysql_native_password
+    image: mysql:8.3.0
     environment:
         MYSQL_ROOT_PASSWORD_FILE: "/run/secrets/db_password"
         MYSQL_PASSWORD_FILE: "/run/secrets/db_password"
@@ -45,10 +44,10 @@ services:
         source: db
         target: /var/lib/mysql
     configs:
-      - source: mysql_2
+      - source: mysql_3
         target: /etc/mysql/conf.d/mysql.cnf
   rabbitmq:
-    image: rabbitmq:3.12.2
+    image: rabbitmq:3.12.12
     healthcheck:
       test: "rabbitmq-diagnostics -q ping"
       interval: 10s
@@ -87,14 +86,10 @@ services:
       - source: rabbitmq
         target: /etc/rabbitmq/rabbitmq.conf
   nginx:
-    image: ghcr.io/sholex-team/nginx:4.2
+    image: ghcr.io/sholex-team/nginx:4.3
     networks:
       - nginx_lilsholex
     ports:
-      - target: 80
-        published: 80
-        protocol: tcp
-        mode: host
       - target: 443
         published: 443
         protocol: tcp
@@ -106,7 +101,7 @@ services:
       start_period: 30s
       retries: 3
     depends_on:
-      - gunicorn
+      - lilsholex
       - celery_flower
     volumes:
       - ./static:/root/lilsholex/static:ro
@@ -145,12 +140,12 @@ services:
       - ssl_key
       - dhparam
   lilsholex:
-    image: ghcr.io/sholex-team/lilsholex:5.7
+    image: ghcr.io/sholex-team/lilsholex:5.8
     networks:
       - db_django
       - nginx_lilsholex
       - cache_django
-      - internet
+      - django_internet
       - tasks_django
     secrets:
       - db_password
@@ -168,7 +163,7 @@ services:
       - migrations
     healthcheck:
       test: python healthchecks/gunicorn.py
-      interval: 10s
+      interval: 15s
       timeout: 5s
       start_period: 30s
       retries: 3
@@ -197,11 +192,11 @@ services:
         window: 10s
         delay: 5s
   celery: &celery_base
-    image: ghcr.io/sholex-team/lilsholex:5.7
+    image: ghcr.io/sholex-team/lilsholex:5.8
     command: "celery -A LilSholex worker -Q celery -l info -c 2 -E"
     networks:
       - db_django
-      - internet
+      - django_internet
       - tasks_django
     secrets:
       - db_password
@@ -256,14 +251,14 @@ services:
       networks:
         - nginx_lilsholex
         - db_django
-        - internet
+        - django_internet
         - tasks_django
   lilsholex_broadcasts:
-    image: ghcr.io/sholex-team/lilsholex:5.7
+    image: ghcr.io/sholex-team/lilsholex:5.8
     command: "python manage.py process_broadcasts"
     networks:
       - db_django
-      - internet
+      - django_internet
     secrets:
       - db_password
       - secret_key
@@ -301,7 +296,7 @@ services:
         window: 10s
         delay: 5s
   memcached:
-    image: memcached:1.6.21
+    image: memcached:1.6.23
     command: "memcached -m 256"
     networks:
       - cache_django
@@ -330,7 +325,7 @@ services:
         monitor: 10s
         order: start-first
   lilsholex_migrations:
-    image: ghcr.io/sholex-team/lilsholex:5.7
+    image: ghcr.io/sholex-team/lilsholex:5.8
     command: "bash -c 'yes | python manage.py makemigrations persianmeme && \
     yes | python manage.py migrate && python manage.py collectstatic --noinput'"
     secrets:
@@ -388,9 +383,9 @@ networks:
     driver: "overlay"
     name: "cache_django"
     internal: true
-  internet:
+  django_internet:
     driver: "overlay"
-    name: "internet"
+    name: "django_internet"
   tasks_django:
     driver: "overlay"
     name: "tasks_django"

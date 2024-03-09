@@ -9,10 +9,8 @@ def handler(request, chosen_inline_result, user_chat_id):
     except Meme.DoesNotExist:
         pass
     else:
-        if (user := User(
-                request.http_session, User.Mode.NORMAL, user_chat_id
-        )).database.use_recent_memes:
+        if (user := User(request.http_session, user_chat_id)).database.use_recent_memes:
             user.add_recent_meme(used_meme)
         if used_meme.visibility == Meme.Visibility.NORMAL:
             used_meme.usage_count = F('usage_count') + 1
-            used_meme.save()
+            used_meme.save(update_fields=('usage_count',))

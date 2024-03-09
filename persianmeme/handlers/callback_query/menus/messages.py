@@ -11,9 +11,7 @@ def handler(command: str, target_id: int, message_id: int, query_id: str, answer
     if not (target_message := get_message(target_id)):
         inliner.database.save()
         raise RequestInterruption()
-    user = UserClass(
-        inliner.session, UserClass.Mode.NORMAL, instance=target_message.sender
-    )
+    user = UserClass(inliner.session, instance=target_message.sender)
     user.send_message(user.translate('checked_by_admin'))
     match command:
         case 'read':

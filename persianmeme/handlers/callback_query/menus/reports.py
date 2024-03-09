@@ -19,7 +19,7 @@ def handler(command: str, query_id: str, message_id: int, answer_query, report: 
         report.meme.sender.report_violation_count = F('report_violation_count') + 1
         report.meme.sender.save()
         report.meme.sender.refresh_from_db()
-        sender = UserClass(inliner.session, UserClass.Mode.NORMAL, instance=report.meme.sender)
+        sender = UserClass(inliner.session, instance=report.meme.sender)
         if sender.database.report_violation_count >= settings.VIOLATION_REPORT_LIMIT:
             sender.database.status = User.Status.BANNED
             sender.database.save()
@@ -46,5 +46,6 @@ def handler(command: str, query_id: str, message_id: int, answer_query, report: 
         answer_query(query_id, translations.admin_messages['report_dismissed'], False)
         edit_message_reply_markup(settings.MEME_REPORTS_CHANNEL, dismissed, message_id, session=inliner.session)
     report.status = Report.Status.REVIEWED
+    report.reviewer = inliner.database
     report.review_date = now()
     report.save()

@@ -1,14 +1,15 @@
 from persianmeme import models, classes, keyboards
 from LilSholex.exceptions import RequestInterruption
 from .menus import start, admin_handler, user_handler
+from django.utils.html import escape
 
 
 def handler(request, message: dict, user_chat_id: int):
-    text = message.get('text', None)
+    if text := message.get('text'):
+        text = escape(text)
     message_id = message['message_id']
-    user = classes.User(request.http_session, classes.User.Mode.SEND_AD, user_chat_id)
+    user = classes.User(request.http_session, user_chat_id)
     user.set_username()
-    user.send_ad()
     user.database.started = True
     if text in ('بازگشت 🔙', 'Back 🔙'):
         user.go_back()

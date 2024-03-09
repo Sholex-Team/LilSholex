@@ -14,11 +14,7 @@ from .menus import (
     meme_tags,
     new_meme,
     message_user,
-    add_ad,
-    delete_ad,
     broadcast,
-    edit_ad_id,
-    edit_ad,
     ban_vote,
     send_edit_meme,
     file_id,
@@ -52,18 +48,10 @@ def handler(message: dict, text: str, message_id: int, user: UserClass):
             message_user_id.handler(text, user)
         case User.Menu.ADMIN_MESSAGE_USER:
             message_user.handler(message_id, user)
-        case User.Menu.ADMIN_ADD_AD:
-            add_ad.handler(message_id, user)
-        case User.Menu.ADMIN_DELETE_AD:
-            delete_ad.handler(text, message_id, user)
         case User.Menu.ADMIN_GET_USER:
             get_user.handler(text, user, message_id)
         case User.Menu.ADMIN_BROADCAST:
             broadcast.handler(message_id, user)
-        case User.Menu.ADMIN_EDIT_AD_ID:
-            edit_ad_id.handler(text, message_id, user)
-        case User.Menu.ADMIN_EDIT_AD:
-            edit_ad.handler(message_id, user)
         case User.Menu.ADMIN_BAN_VOTE if target_vote := user.get_vote(message):
             ban_vote.handler(target_vote, user)
         case User.Menu.ADMIN_SEND_EDIT_MEME if target_meme := user.get_public_meme(message):

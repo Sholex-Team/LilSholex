@@ -14,15 +14,15 @@ def handler(command: str, meme_id: int, message_id: int, query_id: str, answer_q
         )
     except Meme.DoesNotExist:
         raise RequestInterruption()
-    user = User(inliner.session, User.Mode.NORMAL, instance=deleted_meme.sender)
+    user = User(inliner.session, instance=deleted_meme.sender)
     if command == 'r':
         deleted_meme.status = Meme.Status.ACTIVE
-        assigned_admin = User(inliner.session, User.Mode.NORMAL, instance=deleted_meme.assigned_admin)
-        deleted_meme.assigned_admin = None
+        review_admin = User(inliner.session, instance=deleted_meme.review_admin)
+        deleted_meme.review_admin = None
         deleted_meme.save()
-        assigned_admin.send_message(assigned_admin.translate(
+        review_admin.send_message(review_admin.translate(
             'deleted_meme_recovered',
-            assigned_admin.translate(deleted_meme.type_string),
+            review_admin.translate(deleted_meme.type_string),
             deleted_meme.name
         ), parse_mode='HTML')
         answer_query(query_id, translations.admin_messages['meme_recovered'].format(

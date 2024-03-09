@@ -31,3 +31,10 @@ class ReportResult(Enum):
     REPORTED = auto()
     REPORTED_BEFORE = auto()
     REPORT_FAILED = auto()
+
+
+@unique
+class SearchType(Enum):
+    NAMES = auto()
+    TAGS = auto()
+    ALL = auto()

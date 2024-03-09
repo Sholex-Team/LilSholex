@@ -28,13 +28,6 @@ admin_steps = {
     'chat_id': {
         'menu': User.Menu.ADMIN_MESSAGE_USER_ID, 'message': translations.admin_messages['chat_id'], 'before': 'main'
     },
-    'edit_ad': {
-        'menu': User.Menu.ADMIN_EDIT_AD_ID,
-        'message': translations.admin_messages['edit_ad'],
-        'keyboard': keyboards.en_back,
-        'before': 'main',
-        'callback': 'clear_current_ad'
-    },
     'send_edit_meme': {
         'menu': User.Menu.ADMIN_SEND_EDIT_MEME,
         'message': translations.admin_messages['send_edit_meme'],

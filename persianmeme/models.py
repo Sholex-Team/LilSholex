@@ -17,14 +17,6 @@ class MemeType(models.IntegerChoices):
     VIDEO = 1, 'Video'
 
 
-class MemeTag(models.Model):
-    tag = models.CharField(max_length=20, verbose_name='Tag Content', primary_key=True)
-
-    class Meta:
-        ordering = ['tag']
-        db_table = 'persianmeme_meme_tags'
-
-
 class User(models.Model):
     class Status(models.TextChoices):
         ACTIVE = 'a', 'Active'
@@ -64,12 +56,8 @@ class User(models.Model):
         ADMIN_FULL_BAN_USER = 7, 'Admin Full Ban User'
         ADMIN_MESSAGE_USER_ID = 8, 'Admin Message User ID'
         ADMIN_MESSAGE_USER = 9, 'Admin Message User'
-        ADMIN_ADD_AD = 10, 'Admin Add Ad'
-        ADMIN_DELETE_AD = 11, 'Admin Delete Ad'
         ADMIN_GET_USER = 12, 'Admin Get User'
         ADMIN_BROADCAST = 13, 'Admin Broadcast'
-        ADMIN_EDIT_AD_ID = 14, 'Admin Edit Ad ID'
-        ADMIN_EDIT_AD = 15, 'Admin Edit Ad'
         ADMIN_BAN_VOTE = 16, 'Admin Ban Vote'
         ADMIN_GET_MEME = 40, 'Admin Get Meme'
         ADMIN_MEME_TAGS = 42, 'Admin Meme Tags'
@@ -122,9 +110,7 @@ class User(models.Model):
     rank = models.CharField(max_length=1, choices=Rank.choices, default=Rank.USER)
     temp_meme_name = models.CharField(max_length=80, null=True, verbose_name='Temporary Meme Name', blank=True)
     temp_user_id = models.BigIntegerField(null=True, verbose_name='Temporary User ID', blank=True)
-    temp_meme_tags = models.ManyToManyField(
-        MemeTag, 'user_voice_tags', blank=True, verbose_name='Temporary Voice Tags'
-    )
+    temp_meme_tags = models.TextField(blank=True, null=True, max_length=125)
     last_usage_date = models.DateTimeField(auto_now=True)
     vote = models.BooleanField(verbose_name='Vote System', default=False)
     date = models.DateTimeField(verbose_name='Register Date', auto_now_add=True)
@@ -143,7 +129,6 @@ class User(models.Model):
         default=None
     )
     current_meme = models.ForeignKey('Meme', models.SET_NULL, 'user_current_memes', blank=True, null=True, default=None)
-    current_ad = models.ForeignKey('Ad', models.SET_NULL, 'user_ad', null=True, blank=True)
     menu_mode = models.CharField(
         max_length=1, verbose_name='Menu Mode', choices=MenuMode.choices, default=MenuMode.USER
     )
@@ -159,7 +144,8 @@ class User(models.Model):
 
     class Meta:
         db_table = 'persianmeme_users'
-        ordering = ['user_id']
+        ordering = ('user_id',)
+        indexes = (models.Index(fields=('chat_id',)),)
 
     def __str__(self):
         return f'{self.chat_id}:{self.rank}'
@@ -191,11 +177,9 @@ class Meme(models.Model):
     visibility = models.CharField(max_length=1, choices=Visibility.choices, default=Visibility.NORMAL)
     accept_vote = models.ManyToManyField(User, 'accept_vote_users', blank=True, verbose_name='Accept Votes')
     deny_vote = models.ManyToManyField(User, 'deny_vote_users', blank=True, verbose_name='Deny Votes')
-    tags = models.ManyToManyField(MemeTag, 'meme_tags', blank=True)
+    tags = models.CharField(max_length=125, blank=True, null=True)
     usage_count = models.PositiveIntegerField('Usage Count', default=0)
-    assigned_admin = models.ForeignKey(
-        User, models.SET_NULL, 'meme_admin', verbose_name='Assigned Admin', null=True, blank=True
-    )
+    review_admin = models.ForeignKey(User, models.SET_NULL, 'meme_admin', null=True, blank=True)
     reviewed = models.BooleanField('Is Reviewed', default=False)
     type = models.PositiveSmallIntegerField('Meme Type', choices=MemeType.choices, default=MemeType.VOICE)
     description = models.CharField(max_length=120, blank=True, null=True)
@@ -203,7 +187,35 @@ class Meme(models.Model):
 
     class Meta:
         db_table = 'persianmeme_memes'
-        ordering = ['-id']
+        ordering = ('-id',)
+        indexes = (
+            models.Index(
+                fields=('status', 'type'), include=('id', 'file_id', 'name', 'description'), name='memes_index_1'
+            ),
+            models.Index(
+                fields=('id',), include=('file_id', 'name', 'type', 'description'), name='memes_index_2'
+            ),
+            models.Index(
+                fields=('status', 'visibility'),
+                include=('id', 'file_id', 'name', 'type', 'description'),
+                name='memes_index_3'
+            ),
+            models.Index(
+                fields=('sender', 'visibility'),
+                include=('id', 'file_id', 'name', 'type', 'description'),
+                name='memes_index_4'
+            ),
+            models.Index(
+                fields=('status', 'visibility', 'type'),
+                include=('id', 'file_id', 'name', 'description'),
+                name='memes_index_5'
+            ),
+            models.Index(
+                fields=('sender', 'visibility', 'type'),
+                include=('id', 'file_id', 'name', 'description'),
+                name='memes_index_6'
+            )
+        )
 
     def __str__(self):
         return f'{self.name}:{self.file_id}'
@@ -241,8 +253,9 @@ class Meme(models.Model):
             extra_text: str = ''
     ) -> int:
         tags_string = str()
-        for tag in self.tags.all():
-            tags_string += f'\n<code>{tag.tag}</code>'
+        if self.tags:
+            for tag in self.tags.split('\n'):
+                tags_string += f'\n<code>{tag}</code>'
         meme_dict = {
             'caption': f'{extra_text}<b>Meme Name</b>: <code>{self.name}</code>\n\n<b>Meme Tags 👇</b>{tags_string}',
             'parse_mode': 'HTML',
@@ -317,26 +330,12 @@ class Meme(models.Model):
         self.save()
 
 
-class Ad(models.Model):
-    ad_id = models.AutoField(primary_key=True, verbose_name='Ad ID')
-    chat_id = models.BigIntegerField(verbose_name='Chat ID')
-    message_id = models.IntegerField(verbose_name='Message ID')
-    seen = models.ManyToManyField(User, 'mass_seens', verbose_name='Seen By', blank=True)
-
-    class Meta:
-        db_table = 'persianmeme_ads'
-        ordering = ['ad_id']
-
-    def __str__(self):
-        return str(self.ad_id)
-
-
 class Delete(models.Model):
     meme = models.ForeignKey(Meme, models.CASCADE, 'delete_meme')
     user = models.ForeignKey(User, models.CASCADE, 'delete_user')
 
     class Meta:
-        ordering = ['id']
+        ordering = ('id',)
         db_table = 'persianmeme_deletes'
 
     def __str__(self):
@@ -358,7 +357,7 @@ class Broadcast(models.Model):
 
     class Meta:
         db_table = 'persianmeme_broadcasts'
-        ordering = ['id']
+        ordering = ('id',)
 
 
 class Playlist(models.Model):
@@ -373,7 +372,7 @@ class Playlist(models.Model):
 
     class Meta:
         db_table = 'persianmeme_playlists'
-        ordering = ['-date']
+        ordering = ('-date',)
 
     def __str__(self):
         return f'{self.name}:{self.creator.chat_id}'
@@ -389,7 +388,7 @@ class Message(models.Model):
     status = models.PositiveSmallIntegerField(choices=Status.choices, default=Status.PENDING)
 
     class Meta:
-        ordering = ['id']
+        ordering = ('id',)
         db_table = 'persianmeme_messages'
 
     def __str__(self):
@@ -401,7 +400,11 @@ class RecentMeme(models.Model):
     meme = models.ForeignKey(Meme, models.CASCADE, 'recent_meme_meme')
 
     class Meta:
-        ordering = ['-id']
+        ordering = ('-id',)
+        indexes = (
+            models.Index(fields=('user',), include=('id', 'meme'), name='recent_memes_index_1'),
+            models.Index(fields=('user', 'meme'), name='recent_memes_index_2')
+        )
         db_table = 'persianmeme_user_recent_memes'
 
 
@@ -415,12 +418,13 @@ class Report(models.Model):
     )
     reporters = models.ManyToManyField(User, 'report_users', blank=False)
     status = models.PositiveSmallIntegerField(choices=Status.choices, default=Status.PENDING)
+    reviewer = models.ForeignKey(User, models.SET_NULL, 'reviewed_reports', blank=True, null=True)
     report_date = models.DateTimeField(auto_now_add=True)
     review_date = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'persianmeme_reports'
-        ordering = ['report_date']
+        ordering = ('report_date',)
 
 
 class Username(models.Model):
@@ -429,11 +433,13 @@ class Username(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['id']
+        ordering = ('id',)
         constraints = (models.UniqueConstraint(fields=('user', 'username'), name='unique_usernames'),)
+        indexes = (models.Index(fields=('username', 'id')),)
 
     def __str__(self):
         return f'{self.user.chat_id} : {self.username}'
 
 
-BOT_ADMINS = (User.Rank.ADMIN, User.Rank.OWNER)
+ADMINS = (User.Rank.ADMIN, User.Rank.KHIAR, User.Rank.OWNER)
+HIGH_LEVEL_ADMINS = (User.Rank.ADMIN, User.Rank.OWNER)

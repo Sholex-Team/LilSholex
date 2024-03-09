@@ -1,4 +1,4 @@
-FROM python:3.11.4
+FROM python:3.12.2
 
 # Setting working directory
 WORKDIR /home/sholex
@@ -20,4 +20,4 @@ COPY manage.py manage.py
 COPY persianmeme persianmeme
 
 # Running
-CMD gunicorn --workers=2 --threads=2 --keep-alive=200 --bind=0.0.0.0:80 -t 10 LilSholex.wsgi
+CMD gunicorn --workers=1 --threads=2 --keep-alive=200 --bind=0.0.0.0:80 -t 10 LilSholex.wsgi

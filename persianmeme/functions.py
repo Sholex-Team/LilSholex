@@ -3,7 +3,6 @@ from LilSholex import decorators
 from LilSholex.functions import answer_callback_query as answer_callback_query_closure
 from . import models
 from requests import Session as RequestsSession
-from .models import Broadcast
 from .translations import user_messages
 from asgiref.sync import sync_to_async
 from aiohttp import ClientSession, TCPConnector, ClientError
@@ -14,15 +13,6 @@ from .types import ObjectType
 import json
 from LilSholex.exceptions import TooManyRequests
 from random import randint
-
-
-def get_voice(file_unique_id: str, visibility=models.Meme.Visibility.NORMAL):
-    if (target_voice := models.Meme.objects.filter(
-        file_unique_id=file_unique_id,
-        status=models.Meme.Status.ACTIVE,
-        visibility=visibility
-    )).exists():
-        return target_voice.first()
 
 
 def get_admin_voice(voice_id: int):
@@ -66,12 +56,6 @@ def answer_inline_query(
         raise TooManyRequests(response.json()['parameters']['retry_after'])
 
 
-def check_voice(file_unique_id: str):
-    target_voice = models.Meme.objects.filter(file_unique_id=file_unique_id, status=models.Meme.Status.PENDING)
-    if target_voice.exists():
-        return target_voice.first()
-
-
 def answer_callback_query(session: RequestsSession):
     return answer_callback_query_closure(session, settings.MEME)
 
@@ -94,16 +78,6 @@ def send_message(chat_id: int, text: str, session: RequestsSession = RequestsSes
         raise TooManyRequests(response.json()['parameters']['retry_after'])
 
 
-def accept_voice(file_unique_id: str):
-    if (
-            voice := models.Meme.objects.filter(file_unique_id=file_unique_id, status=models.Meme.Status.SEMI_ACTIVE)
-    ).exists():
-        voice = voice.first()
-        voice.status = models.Meme.Status.ACTIVE
-        voice.save()
-        return True
-
-
 @sync_to_async
 def get_page(broadcast: models.Broadcast):
     db.close_old_connections()
@@ -117,7 +91,7 @@ def get_page(broadcast: models.Broadcast):
     return result
 
 
-async def perform_broadcast(broadcast: Broadcast):
+async def perform_broadcast(broadcast: models.Broadcast):
     from_chat_id = (await broadcast.get_sender).chat_id
     message_id = broadcast.message_id
     async with ClientSession(connector=TCPConnector(
@@ -155,7 +129,7 @@ def make_result(meme: list, caption: str | None):
             temp_result['caption'] = f'<b>{caption}</b>'
             temp_result['parse_mode'] = 'HTML'
             temp_result['description'] = caption
-        else:
+        elif meme[4]:
             temp_result['description'] = meme[4]
     else:
         temp_result['type'] = 'voice'
@@ -189,7 +163,7 @@ def make_meme_result(meme: models.Meme, caption: str | None):
             temp_result['caption'] = f'<b>{caption}</b>'
             temp_result['parse_mode'] = 'HTML'
             temp_result['description'] = caption
-        else:
+        elif meme.description:
             temp_result['description'] = temp_result['description'] = meme.description
     else:
         temp_result['type'] = 'voice'
@@ -252,13 +226,6 @@ def get_message(message_id: int):
     return target_message
 
 
-def create_voice_list(voices: tuple):
-    voices_str = str()
-    for voice in voices:
-        voices_str += f'⭕ {voice.name}\n'
-    return voices_str
-
-
 @decorators.sync_fix
 def edit_message_reply_markup(
         chat_id: int,
@@ -298,7 +265,7 @@ def check_for_video(message: dict, bypass_limits: bool):
 
 
 def create_description(tags):
-    return ', '.join([meme_tag.tag for meme_tag in tags])
+    return tags.replace('\n', ', ')
 
 
 def fake_deny_vote(queryset):
@@ -318,3 +285,27 @@ def fake_deny_vote(queryset):
             faked_count += 1
             meme.deny_vote.set(models.User.objects.all()[:random_fake])
     return faked_count
+
+
+def clean_query(query):
+    new_query = str()
+    for char in query:
+        if char not in settings.SENSITIVE_CHARACTERS:
+            new_query += char
+    return new_query.strip()
+
+
+def handle_message_params(
+        message: dict,
+        reply_markup: dict | None = None,
+        reply_to_message_id: int | None = None,
+        parse_mode: str | None = None
+):
+    if reply_markup:
+        message['reply_markup'] = json.dumps(reply_markup)
+    if reply_to_message_id:
+        message['reply_parameters'] = json.dumps(
+            {'message_id': reply_to_message_id, 'allow_sending_without_reply': True}
+        )
+    if parse_mode:
+        message['parse_mode'] = parse_mode

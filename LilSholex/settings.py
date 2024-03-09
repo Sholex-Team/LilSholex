@@ -31,6 +31,9 @@ NAMES_KEY = 'names:'
 TAGS_KEY = 'tags:'
 VOICES_KEY = 'voices:'
 VIDEOS_KEY = 'videos:'
+SENSITIVE_WORDS = (NAMES_KEY, TAGS_KEY, VOICES_KEY, VIDEOS_KEY)
+MAX_TAG_LENGTH = 20
+SENSITIVE_CHARACTERS = {'<', '>', '(', ')', '+', '*', '"', '@', '~', '%', '-'}
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
@@ -50,10 +53,11 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
+    'LilSholex.middleware.TelegramMiddleware',
+    'LilSholex.middleware.CSessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
+    'LilSholex.middleware.CAuthenticationMiddleware',
+    'LilSholex.middleware.CMessageMiddleware',
 ]
 
 ROOT_URLCONF = 'LilSholex.urls'

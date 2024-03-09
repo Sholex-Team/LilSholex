@@ -1,7 +1,6 @@
 import json
 from django.conf import settings
 from LilSholex.decorators import sync_fix
-from LilSholex.classes import Base
 from datetime import datetime, timedelta
 from .functions import (
     make_like_result,
@@ -12,9 +11,10 @@ from .functions import (
     make_list_string,
     check_for_voice,
     check_for_video,
-    create_description
+    create_description,
+    clean_query,
+    handle_message_params
 )
-from enum import Enum
 from . import translations, models, steps
 from .keyboards import (
     report as report_keyboard,
@@ -26,10 +26,9 @@ from .keyboards import (
     user as user_keyboard,
     meme_review
 )
-from .types import InvalidMemeTag, LongMemeTag, TooManyMemeTags
+from .types import InvalidMemeTag, LongMemeTag, TooManyMemeTags, SearchType
 from string import punctuation
-from itertools import combinations
-from django.db.models import Q, Case, When, BooleanField
+from django.db.models import Q
 from .types import ObjectType, ReportResult
 from requests import Session
 from .tasks import revoke_review
@@ -37,32 +36,119 @@ from LilSholex.exceptions import TooManyRequests
 from functools import cached_property
 
 
-class User(Base):
+class User:
     _BASE_URL = f'https://api.telegram.org/bot{settings.MEME}/'
-    __ads: tuple
-
-    class Mode(Enum):
-        NORMAL = 0
-        SEND_AD = 1
 
     def __init__(
             self,
             session: Session,
-            mode: Mode,
             chat_id: int = None,
             instance: models.User = None
     ):
-        self.__mode = mode
-        super().__init__(settings.MEME, chat_id, instance, session)
+        self._token = settings.MEME
+        self.chat_id = chat_id
+        self.session = session
+        self._instance = instance
+        if not self.chat_id:
+            assert self._instance, 'Instance must be passed when chat id isn\'t !'
+            self.database = self._instance
+        else:
+            self.database = models.User.objects.get_or_create(chat_id=self.chat_id)[0]
+        self._BASE_PARAM = {'chat_id': self.database.chat_id}
+
+    @sync_fix
+    def send_message(
+            self,
+            text: str,
+            reply_markup: dict = None,
+            reply_to_message_id: int | None = None,
+            parse_mode: str | None = None,
+            disable_web_page_preview: bool = True,
+    ) -> int:
+        message = {
+            **self._BASE_PARAM,
+            'text': text,
+            'disable_web_page_preview': str(disable_web_page_preview)
+        }
+        handle_message_params(message, reply_markup, reply_to_message_id, parse_mode)
+        with self.session.get(
+            f'{self._BASE_URL}sendMessage',
+            params=message,
+            timeout=settings.REQUESTS_TIMEOUT
+        ) as response:
+            if response.status_code == 200:
+                if (result := response.json())['ok']:
+                    return result['result']['message_id']
+            elif response.status_code != 429:
+                return 0
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
+
+    @sync_fix
+    def delete_message(self, message_id: int) -> None:
+        with self.session.get(
+            f'{self._BASE_URL}deleteMessage',
+            params={**self._BASE_PARAM, 'message_id': message_id},
+            timeout=settings.REQUESTS_TIMEOUT
+        ) as response:
+            if response.status_code != 429:
+                return
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
+
+    @sync_fix
+    def edit_message_text(self, message_id: int, text: str, inline_keyboard: dict = str()):
+        if inline_keyboard:
+            inline_keyboard = json.dumps(inline_keyboard)
+        with self.session.get(
+            f'{self._BASE_URL}editMessageText',
+            params={**self._BASE_PARAM, 'message_id': message_id, 'text': text, 'reply_markup': inline_keyboard},
+            timeout=settings.REQUESTS_TIMEOUT
+        ) as response:
+            if response.status_code != 429:
+                return
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
+
+    @sync_fix
+    def send_animation(
+            self,
+            animation: str,
+            caption: str = str(),
+            reply_markup: dict | None = None,
+            reply_to_message_id: int | None = None,
+            parse_mode: str | None = None
+    ):
+        message = {**self._BASE_PARAM, 'animation': animation, 'caption': caption}
+        handle_message_params(message, reply_markup, reply_to_message_id, parse_mode)
+        with self.session.get(
+                f'{self._BASE_URL}sendAnimation', params=message, timeout=settings.REQUESTS_TIMEOUT
+        ) as response:
+            if response.status_code != 429:
+                return
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
+
+    @sync_fix
+    def pin_chat_message(self, chat_id: int, message_id: int):
+        with self.session.get(
+            f'{self._BASE_URL}pinChatMessage',
+            params={'chat_id': chat_id, 'message_id': message_id},
+            timeout=settings.REQUESTS_TIMEOUT
+        ) as response:
+            if response.status_code != 429:
+                return
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
+
+    @sync_fix
+    def unpin_chat_message(self, chat_id: int, message_id: int):
+        with self.session.get(
+            f'{self._BASE_URL}unpinChatMessage',
+            params={'chat_id': chat_id, 'message_id': message_id},
+            timeout=settings.REQUESTS_TIMEOUT
+        ) as response:
+            if response.status_code != 429:
+                return
+            raise TooManyRequests(response.json()['parameters']['retry_after'])
 
     def broadcast(self, message_id: int):
         return models.Broadcast.objects.create(sender=self.database, message_id=message_id).id
-
-    def get_user(self):
-        user = models.User.objects.get_or_create(chat_id=self.chat_id)[0]
-        if self.__mode == self.Mode.SEND_AD:
-            self.__ads = models.Ad.objects.exclude(seen=user)
-        return user
 
     def delete_current_meme(self):
         if self.database.current_meme:
@@ -79,7 +165,7 @@ class User(Base):
             type=meme_type
         )).exists():
             target_meme = result.first()
-            target_meme.assigned_admin = self.database
+            target_meme.review_admin = self.database
             target_meme.delete(admin=self.database, log=True)
 
     def cancel_voting(self, meme_type: models.MemeType):
@@ -98,50 +184,38 @@ class User(Base):
         ))
 
     @sync_fix
-    def send_current_meme(self, reply_markup: dict = '', reply_to_message_id: int = ''):
-        if reply_markup:
-            reply_markup = json.dumps(reply_markup)
-        params = {
-            'caption': self.database.current_meme.name,
-            'reply_markup': reply_markup,
-            'reply_to_message_id': reply_to_message_id
-        }
+    def send_current_meme(self, reply_markup: dict | None = None, reply_to_message_id: int | None = None):
+        message = {'caption': self.database.current_meme.name}
+        handle_message_params(message, reply_markup, reply_to_message_id)
         if self.database.current_meme.type == models.MemeType.VOICE:
             meme_method = 'Voice'
-            params['voice'] = self.database.current_meme.file_id
+            message['voice'] = self.database.current_meme.file_id
         else:
             meme_method = 'Video'
-            params['video'] = self.database.current_meme.file_id
+            message['video'] = self.database.current_meme.file_id
         with self.session.get(
             f'{self._BASE_URL}send{meme_method}',
-            params={**self._BASE_PARAM, **params},
+            params={**self._BASE_PARAM, **message},
             timeout=settings.REQUESTS_TIMEOUT
         ) as response:
             if response.status_code != 429:
                 return
             raise TooManyRequests(response.json()['parameters']['retry_after'])
 
-    def delete_message(self, message_id: int):
-        with self.session.get(
-            f'{self._BASE_URL}deleteMessage', params={**self._BASE_PARAM, 'message_id': message_id},
-            timeout=settings.REQUESTS_TIMEOUT
-        ) as _:
-            return
-
     @sync_fix
     def copy_message(
             self,
             message_id: int,
-            reply_markup: dict = '',
+            reply_markup: dict | None = None,
             from_chat_id: int = None,
             chat_id: int = None,
             protect_content: bool = False
     ):
-        assert (chat_id and not from_chat_id) or (from_chat_id and not chat_id),\
+        assert (chat_id and not from_chat_id) or (from_chat_id and not chat_id), \
             'You must use a chat_id or a from_chat_id !'
+        base_param = {'message_id': message_id, 'protect_content': protect_content}
         if reply_markup:
-            reply_markup = json.dumps(reply_markup)
-        base_param = {'message_id': message_id, 'reply_markup': reply_markup, 'protect_content': protect_content}
+            base_param['reply_markup'] = json.dumps(reply_markup)
         with self.session.get(
             f'{self._BASE_URL}copyMessage',
             params={
@@ -158,97 +232,97 @@ class User(Base):
                 return False
             raise TooManyRequests(response.json()['parameters']['retry_after'])
 
-    def __save_ad(self, ad: models.Ad):
-        ad.seen.add(self.database)
-        ad.save()
+    def _get_recent_memes(self, meme_type: models.User.SearchItems):
+        query = Q(user=self.database, meme__status=models.Meme.Status.ACTIVE)
+        if meme_type != models.User.SearchItems.BOTH:
+            query &= Q(meme__type=meme_type)
+        return models.RecentMeme.objects.filter(query).select_related('meme').values_list(
+            'meme__id', 'meme__file_id', 'meme__name', 'meme__type', 'meme__description'
+        )
 
-    def send_ad(self):
-        for ad in self.__ads:
-            self.copy_message(ad.message_id, from_chat_id=ad.chat_id)
-            self.__save_ad(ad)
-
-    @property
-    def __search_items(self):
-        match self.database.search_items:
-            case models.User.SearchItems.VIDEOS:
-                return Q(type=models.MemeType.VIDEO), Q(meme__type=models.MemeType.VIDEO)
-            case models.User.SearchItems.VOICES:
-                return Q(type=models.MemeType.VOICE), Q(meme__type=models.MemeType.VOICE)
-            case models.User.SearchItems.BOTH:
-                return Q(type__in=(types_tuple := (models.MemeType.VOICE, models.MemeType.VIDEO))), \
-                       Q(meme__type__in=types_tuple)
+    def _search_memes(
+            self, search_type: SearchType, meme_type: models.User.SearchItems, query: str, begin: int, remaining: int
+    ):
+        base_query = ('SELECT id, file_id, name, type, description FROM persianmeme_memes WHERE '
+                      '((status=%s AND visibility=%s) OR (sender_id=%s AND visibility=%s)) AND ')
+        params = [
+            models.Meme.Status.ACTIVE.value,
+            models.Meme.Visibility.NORMAL.value,
+            self.database.user_id,
+            models.Meme.Visibility.PRIVATE.value
+        ]
+        if meme_type != models.User.SearchItems.BOTH:
+            base_query += 'type=%s AND '
+            params.append(meme_type)
+        match search_type:
+            case SearchType.NAMES:
+                base_query += '(MATCH (name) AGAINST (%s IN BOOLEAN MODE)) '
+                params.append('+' + ' +'.join(query.split()) + '*')
+            case SearchType.TAGS:
+                base_query += '(MATCH (tags) AGAINST (%s IN BOOLEAN MODE)) '
+                params.append('* '.join(query.split()) + '*')
+            case _:
+                base_query += ('(MATCH (name) AGAINST (%s IN BOOLEAN MODE) OR '
+                               'MATCH (tags) AGAINST (%s IN BOOLEAN MODE)) ')
+                params.append(param := '+' + ' +'.join(query.split()) + '*')
+                params.append(param)
+        base_query += 'LIMIT %s OFFSET %s'
+        params.append(remaining)
+        params.append(begin)
+        return models.Meme.objects.raw(base_query, params)
 
     def get_memes(self, query: str, offset: str, caption: str | None):
-        if query.startswith(settings.NAMES_KEY):
-            query = query[6:].strip()
-            queries = Q(name__icontains=query)
-            type_filter, recent_type_filter = self.__search_items
-        elif query.startswith(settings.ID_KEY) and (target_voice_id := query[3:].strip()).isdigit():
+        if query.startswith(settings.ID_KEY) and (target_voice_id := query[3:].strip()).isdigit():
             result_maker = make_meme_like_result if self.database.vote else make_meme_result
             try:
                 return ([result_maker(models.Meme.objects.get(
-                    Q(id=target_voice_id) & ((
-                                                     Q(visibility=models.Meme.Visibility.PRIVATE) &
-                                                     Q(sender=self.database)
-                                             ) | Q(visibility=models.Meme.Visibility.NORMAL)) & Q(
-                        status=models.Meme.Status.ACTIVE)
-                ), caption)], str())
+                    Q(id=target_voice_id) & ((Q(visibility=models.Meme.Visibility.PRIVATE) & Q(sender=self.database)) |
+                                             Q(visibility=models.Meme.Visibility.NORMAL)) &
+                    Q(status=models.Meme.Status.ACTIVE)), caption)], str())
             except (models.Meme.DoesNotExist, ValueError):
                 return list(), str()
+        if query.startswith(settings.NAMES_KEY):
+            query = query[len(settings.NAMES_KEY):]
+            search_type = SearchType.NAMES
+        elif query.startswith(settings.TAGS_KEY):
+            query = query[len(settings.TAGS_KEY):]
+            search_type = SearchType.TAGS
         else:
-            if is_tags := query.startswith(settings.TAGS_KEY):
-                query = query[5:].strip()
-                type_filter, recent_type_filter = self.__search_items
-            else:
-                if query.startswith(settings.VOICES_KEY):
-                    query = query[7:].strip()
-                    type_filter = Q(type=models.MemeType.VOICE)
-                    recent_type_filter = Q(meme__type=models.MemeType.VOICE)
-                elif query.startswith(settings.VIDEOS_KEY):
-                    query = query[7:].strip()
-                    type_filter = Q(type=models.MemeType.VIDEO)
-                    recent_type_filter = Q(meme__type=models.MemeType.VIDEO)
-                else:
-                    type_filter, recent_type_filter = self.__search_items
-            first_tags = query.split()
-            second_tags = [
-                ' '.join(first_tags[start:end + 1]) for start, end in combinations(range(len(first_tags)), 2)
-            ]
-            queries = (Q(tags__tag__iexact=first_tags.pop(0)) if first_tags else Q()) if is_tags else \
-                Q(name__icontains=query)
-            for tag in first_tags:
-                queries |= Q(tags__tag__iexact=tag)
-            for tag in second_tags:
-                queries |= Q(tags__tag__iexact=tag)
-        is_name = Case(When(name__icontains=query, then=True), default=False, output_field=BooleanField())
+            search_type = SearchType.ALL
+        if query.startswith(settings.VIDEOS_KEY):
+            query = query[len(settings.VIDEOS_KEY):]
+            meme_type = models.User.SearchItems.VIDEOS.value
+        elif query.startswith(settings.VOICES_KEY):
+            query = query[len(settings.VOICES_KEY):]
+            meme_type = models.User.SearchItems.VOICES.value
+        else:
+            meme_type = self.database.search_items
+        query = clean_query(query)
         result_sets = (
-            lambda: models.RecentMeme.objects.filter(
-                Q(user=self.database, meme__status=models.Meme.Status.ACTIVE) & recent_type_filter
-            ).select_related('meme').values_list(
-                'meme__id', 'meme__file_id', 'meme__name', 'meme__type', 'meme__description'
-            ) if not query and self.database.use_recent_memes else tuple(),
-            lambda: [
-                voice for playlist in self.database.playlists.prefetch_related('voices')
-                for voice in playlist.voices.values_list('id', 'file_id', 'name', 'type', 'description').filter(
-                    queries & type_filter
-                ).annotate(is_name=is_name).order_by('-is_name', self.database.meme_ordering).distinct()
-            ],
-            lambda: models.Meme.objects.values_list('id', 'file_id', 'name', 'type', 'description').filter(
-                queries & (
-                        (Q(status=models.Meme.Status.ACTIVE) & Q(visibility=models.Meme.Visibility.NORMAL)) |
-                        (Q(sender=self.database) & Q(visibility=models.Meme.Visibility.PRIVATE))
-                ) & type_filter
-            ).annotate(is_name=is_name).order_by('-visibility', '-is_name', self.database.meme_ordering).distinct()
+            lambda begin, remaining_memes: (
+                make_like_result if self.database.vote else make_result,
+                self._get_recent_memes(meme_type)[begin:begin + remaining_memes]
+                if not query and self.database.use_recent_memes else tuple()
+            ),
+            lambda begin, remaining_memes: (
+                (make_like_result if self.database.vote else make_result) if not query else
+                (make_meme_like_result if self.database.vote else make_meme_result),
+                models.Meme.objects.values_list('id', 'file_id', 'name', 'type', 'description').filter(
+                    ((Q(status=models.Meme.Status.ACTIVE) & Q(visibility=models.Meme.Visibility.NORMAL)) |
+                     (Q(sender=self.database) & Q(visibility=models.Meme.Visibility.PRIVATE))) &
+                    (Q(type=meme_type) if meme_type != models.User.SearchItems.BOTH else Q())
+                ).order_by(self.database.meme_ordering)[begin:begin + remaining_memes]
+                if not query else self._search_memes(search_type, meme_type, query, begin, remaining_memes)
+            )
         )
         if len(splinted_offset := offset.split(':')) != len(result_sets):
             splinted_offset = [0] * len(result_sets)
         results = []
         remaining = 50
-        result_maker = make_like_result if self.database.vote else make_result
         for result, current_offset in zip(result_sets, range(len(result_sets))):
             if splinted_offset[current_offset] != 'e':
                 splinted_offset[current_offset] = int(splinted_offset[current_offset])
-                current_result = result()[splinted_offset[current_offset]:splinted_offset[current_offset] + remaining]
+                result_maker, current_result = result(splinted_offset[current_offset], remaining)
                 temp_result = [result_maker(meme, caption) for meme in current_result
                                if all(meme[0] != target_result['id'] for target_result in results)]
                 if not (temp_len := len(temp_result)):
@@ -346,8 +420,9 @@ class User(Base):
             visibility=models.Meme.Visibility.PRIVATE,
             sender=self.database,
             name=self.database.temp_meme_name,
-        ).tags.set(self.database.temp_meme_tags.all(), clear=True)
-        self.database.temp_meme_tags.clear()
+            tags=self.database.temp_meme_tags
+        )
+        self.database.temp_meme_tags = None
         return True
 
     def delete_suggested_meme(self):
@@ -444,13 +519,6 @@ class User(Base):
         self.database.current_playlist.delete()
         self.database.current_playlist = None
 
-    def edit_current_ad(self, message_id: int):
-        if self.database.current_ad:
-            self.database.current_ad.message_id = message_id
-            self.database.current_ad.save()
-            return True
-        return False
-
     def get_vote(self, message: dict):
         if matched := check_for_voice(message):
             target_vote = models.Meme.objects.filter(
@@ -505,13 +573,16 @@ class User(Base):
         else:
             if any(char in punctuation for char in tags):
                 raise InvalidMemeTag()
-        tags = tags.split('\n')
-        if len(tags) > 6:
+        split_tags = list()
+        for tag in tags.split('\n'):
+            if not (stripped_tag := tag.strip()):
+                continue
+            if len(stripped_tag) > settings.MAX_TAG_LENGTH:
+                raise LongMemeTag()
+            split_tags.append(stripped_tag)
+        if not split_tags or len(split_tags) > 6:
             raise TooManyMemeTags()
-        if any(len(tag) > models.MemeTag._meta.get_field('tag').max_length for tag in tags):
-            raise LongMemeTag()
-        for tag in tags:
-            self.database.temp_meme_tags.add(models.MemeTag.objects.get_or_create(tag=tag.strip())[0])
+        self.database.temp_meme_tags = '\n'.join(split_tags)
 
     def process_meme_tags(self, tags: str):
         if not tags:
@@ -525,7 +596,7 @@ class User(Base):
         return True
 
     def clear_temp_meme_tags(self):
-        self.database.temp_meme_tags.clear()
+        self.database.temp_meme_tags = None
 
     def initial_meme_check(self, message: dict, meme_type: models.MemeType or int):
         if meme_type == models.MemeType.VOICE:
@@ -533,7 +604,7 @@ class User(Base):
                 return False
             initial_check_result = message['voice']['file_id'], message['voice']['file_unique_id']
         else:
-            if not check_for_video(message, self.database.rank in models.BOT_ADMINS):
+            if not check_for_video(message, self.database.rank in models.HIGH_LEVEL_ADMINS):
                 self.send_message(self.translate('send_a_meme', self.translate('video')))
                 return False
             initial_check_result = message['video']['file_id'], message['video']['file_unique_id']
@@ -561,17 +632,17 @@ class User(Base):
             sender=self.database,
             status=status,
             type=self.database.temp_meme_type,
-            description=create_description(self.database.temp_meme_tags.all()) if
-            self.database.temp_meme_type == models.MemeType.VIDEO else None
+            tags=self.database.temp_meme_tags,
+            description=create_description(self.database.temp_meme_tags) if
+            self.database.temp_meme_type == models.MemeType.VIDEO and self.database.temp_meme_tags else None
         )
-        new_meme.tags.set(self.database.temp_meme_tags.all(), clear=True)
-        self.database.temp_meme_tags.clear()
+        self.database.temp_meme_tags = None
         return new_meme
 
     def validate_meme_name(self, message: dict, text: str, meme_type: models.MemeType or int):
-        if not text or \
-                message.get('entities') or len(text) > 80 or text.startswith('tags:') or \
-                text.startswith('names:'):
+        if (not text or
+                message.get('entities') or len(text) > 80 or
+                any(text.startswith(word) for word in settings.SENSITIVE_WORDS)):
             self.send_message(
                 self.translate('invalid_meme_name', self.translate(
                     'voice' if meme_type == models.MemeType.VOICE else 'video'
@@ -616,19 +687,16 @@ class User(Base):
     def clear_current_meme(self):
         self.database.current_meme = None
 
-    def clear_current_ad(self):
-        self.database.current_ad = None
-
     def menu_cleanup(self):
         self.__perform_back_callback(self.__back_menu.get('callback'))
 
-    def add_recent_meme(self, voice: models.Meme):
-        self.database.recent_memes.remove(voice)
-        self.database.recent_memes.add(voice)
-        if extra_voices := tuple(models.RecentMeme.objects.filter(
-                user=self.database
+    def add_recent_meme(self, meme: models.Meme):
+        self.database.recent_memes.remove(meme)
+        self.database.recent_memes.add(meme)
+        if extra_memes := tuple(models.RecentMeme.objects.filter(
+            user=self.database
         ).order_by('-id')[20:].values_list('id', flat=True)):
-            models.RecentMeme.objects.filter(id__in=extra_voices).delete()
+            models.RecentMeme.objects.filter(id__in=extra_memes).delete()
 
     def send_ordered_meme_list(self, ordering: models.User.Ordering):
         ordered_memes = models.Meme.objects.filter(
@@ -681,20 +749,20 @@ class User(Base):
 
     def assign_meme(self):
         if (assigned_meme := models.Meme.objects.filter(
-                assigned_admin=self.database,
+                review_admin=self.database,
                 reviewed=False,
                 visibility=models.Meme.Visibility.NORMAL,
                 status=models.Meme.Status.ACTIVE
         )).exists():
             self.database.current_meme = assigned_meme.first()
         elif (new_meme := models.Meme.objects.filter(
-                assigned_admin=None,
+                review_admin=None,
                 reviewed=False,
                 status=models.Meme.Status.ACTIVE,
                 visibility=models.Meme.Visibility.NORMAL
         )).exists():
             self.database.current_meme = new_meme.first()
-            self.database.current_meme.assigned_admin = self.database
+            self.database.current_meme.review_admin = self.database
             self.database.current_meme.save()
             revoke_review.apply_async((self.database.current_meme.id,), countdown=settings.REVOKE_REVIEW_COUNTDOWN)
         else:
@@ -730,9 +798,10 @@ class User(Base):
             return ReportResult.REPORT_FAILED
         if created or not report.reporters.filter(user_id=self.database.user_id).exists():
             if created:
-                report.meme.send_meme(
+                if message_id := report.meme.send_meme(
                     settings.MEME_REPORTS_CHANNEL, self.session, report_keyboard(report.meme.id)
-                )
+                ):
+                    self.pin_chat_message(settings.MEME_REPORTS_CHANNEL, message_id)
             report.reporters.add(self.database)
             if report.reporters.count() == settings.VIOLATION_REPORT_LIMIT:
                 if report.meme.status == models.Meme.Status.PENDING:
@@ -744,5 +813,5 @@ class User(Base):
         return ReportResult.REPORTED_BEFORE
 
     def edit_meme_tags(self):
-        self.database.current_meme.tags.set(self.database.temp_meme_tags.all(), clear=True)
-        self.database.temp_meme_tags.clear()
+        self.database.current_meme.tags = self.database.temp_meme_tags
+        self.database.temp_meme_tags = None

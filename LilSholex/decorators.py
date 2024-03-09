@@ -3,9 +3,11 @@ from requests import RequestException
 from asyncio import sleep as async_sleep
 from time import sleep as sync_sleep
 from .exceptions import TooManyRequests
+from functools import wraps
 
 
 def async_fix(func):
+    @wraps(func)
     async def check_exception(*args, **kwargs):
         while True:
             try:
@@ -17,6 +19,7 @@ def async_fix(func):
 
 
 def sync_fix(func):
+    @wraps(func)
     def check_exception(*args, **kwargs):
         while True:
             try:

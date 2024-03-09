@@ -1,4 +1,4 @@
-from persianmeme.models import Meme, BOT_ADMINS, User
+from persianmeme.models import Meme, ADMINS, User
 from LilSholex.exceptions import RequestInterruption
 from persianmeme.translations import admin_messages
 from persianmeme.classes import User as UserClass
@@ -11,7 +11,7 @@ def handler(vote_option: str, query_id: str, meme_id: int, answer_query, inliner
         raise RequestInterruption()
     match vote_option:
         case 'a':
-            if inliner.database.rank in BOT_ADMINS and inliner.database.menu == User.Menu.ADMIN_GOD_MODE:
+            if inliner.database.rank in ADMINS and inliner.database.menu == User.Menu.ADMIN_GOD_MODE:
                 answer_query(
                     query_id, admin_messages['admin_meme_accepted'].format(admin_messages[meme.type_string]), True
                 )
@@ -23,7 +23,7 @@ def handler(vote_option: str, query_id: str, meme_id: int, answer_query, inliner
             else:
                 answer_query(query_id, inliner.translate('voted'), False)
         case 'd':
-            if inliner.database.rank in BOT_ADMINS and inliner.database.menu == User.Menu.ADMIN_GOD_MODE:
+            if inliner.database.rank in ADMINS and inliner.database.menu == User.Menu.ADMIN_GOD_MODE:
                 answer_query(
                     query_id, admin_messages['admin_meme_denied'].format(admin_messages[meme.type_string]), True
                 )

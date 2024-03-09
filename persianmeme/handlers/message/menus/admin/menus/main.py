@@ -1,6 +1,6 @@
 from persianmeme import functions, keyboards
 from persianmeme.classes import User as UserClass
-from persianmeme.models import User, BOT_ADMINS, Delete
+from persianmeme.models import User, HIGH_LEVEL_ADMINS, Delete
 from persianmeme.translations import admin_messages
 
 
@@ -15,6 +15,9 @@ def handler(message: dict, text: str, user: UserClass, message_id: int):
             user.send_message(functions.count_memes())
         case 'Member Count':
             user.send_message(user.translate('member_count', User.objects.count()))
+        case 'God Mode':
+            user.database.menu = User.Menu.ADMIN_GOD_MODE
+            user.send_message(admin_messages['god_mode'], keyboards.en_back, message_id)
         case _:
             if (search_result := user.get_public_meme(message)) is False:
                 not_matched = True
@@ -25,7 +28,7 @@ def handler(message: dict, text: str, user: UserClass, message_id: int):
                     ),
                     keyboards.use(search_result.id)
                 )
-    if not_matched and user.database.rank in BOT_ADMINS:
+    if not_matched and user.database.rank in HIGH_LEVEL_ADMINS:
         match text:
             case 'Get User':
                 user.database.menu = User.Menu.ADMIN_GET_USER
@@ -55,20 +58,11 @@ def handler(message: dict, text: str, user: UserClass, message_id: int):
                 user.send_message(admin_messages['send_document'], keyboards.en_back)
             case 'Meme Review' if user.assign_meme():
                 user.database.menu = User.Menu.ADMIN_MEME_REVIEW
-            case 'God Mode':
-                user.database.menu = User.Menu.ADMIN_GOD_MODE
-                user.send_message(admin_messages['god_mode'], keyboards.en_back, message_id)
             case _ if user.database.rank == user.database.Rank.OWNER:
                 match text:
                     case 'Message User':
                         user.database.menu = User.Menu.ADMIN_MESSAGE_USER_ID
                         user.send_message(admin_messages['chat_id'], keyboards.en_back)
-                    case 'Add Ad':
-                        user.database.menu = User.Menu.ADMIN_ADD_AD
-                        user.send_message(admin_messages['send_ad'], keyboards.en_back)
-                    case 'Delete Ad':
-                        user.database.menu = User.Menu.ADMIN_DELETE_AD
-                        user.send_message(admin_messages['send_ad_id'], keyboards.en_back)
                     case 'Delete Requests':
                         if (delete_requests := Delete.objects.all()).exists():
                             for delete_request in delete_requests:
@@ -90,9 +84,6 @@ def handler(message: dict, text: str, user: UserClass, message_id: int):
                     case 'Broadcast':
                         user.database.menu = User.Menu.ADMIN_BROADCAST
                         user.send_message(admin_messages['broadcast'], keyboards.en_back)
-                    case 'Edit Ad':
-                        user.database.menu = User.Menu.ADMIN_EDIT_AD_ID
-                        user.send_message(admin_messages['edit_ad'], keyboards.en_back)
                     case 'Messages':
                         user.send_messages()
                     case 'Started Count':

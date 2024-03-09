@@ -19,7 +19,7 @@ def handler(text: str, message_id: int, user: UserClass):
                 user.database.back_menu = 'meme_review'
                 user.database.menu = User.Menu.ADMIN_EDIT_MEME_TAGS
                 user.send_message(admin_messages['edit_meme_tags'].format(user.current_meme_translation), en_back)
-            case 'Edit Tags & Description' if user.database.current_meme.type == MemeType.VIDEO:
+            case 'Edit Tags &amp; Description' if user.database.current_meme.type == MemeType.VIDEO:
                 user.database.back_menu = 'meme_review'
                 user.database.menu = User.Menu.ADMIN_EDIT_MEME_TAGS_AND_DESCRIPTION
                 user.send_message(admin_messages['edit_meme_tags'].format(user.current_meme_translation), en_back)

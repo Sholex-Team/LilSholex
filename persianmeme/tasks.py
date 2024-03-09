@@ -11,7 +11,7 @@ def revoke_review(meme_id: int):
         target_meme = Meme.objects.get(id=meme_id, reviewed=False, status=Meme.Status.ACTIVE)
     except Meme.DoesNotExist:
         return
-    target_meme.assigned_admin = None
+    target_meme.review_admin = None
     target_meme.save()
 
 

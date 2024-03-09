@@ -1,6 +1,6 @@
 from persianmeme import functions, classes
 from LilSholex.exceptions import RequestInterruption
-from persianmeme.models import User, Report, BOT_ADMINS
+from persianmeme.models import User, Report, HIGH_LEVEL_ADMINS
 from persianmeme.types import ObjectType
 from .menus import (
     user_profile,
@@ -25,13 +25,12 @@ def handler(request, callback_query, user_chat_id):
     if callback_query['data'] == 'none':
         raise RequestInterruption()
     query_id = callback_query['id']
-    inliner = classes.User(request.http_session, classes.User.Mode.SEND_AD, user_chat_id)
+    inliner = classes.User(request.http_session, user_chat_id)
     inliner.upload_voice()
     if not inliner.database.started:
         answer_query(query_id, inliner.translate('start_to_use'), True)
         inliner.database.save()
         raise RequestInterruption()
-    inliner.send_ad()
     callback_data = callback_query['data'].split(':')
     try:
         message = callback_query['message']
@@ -61,7 +60,7 @@ def handler(request, callback_query, user_chat_id):
             object_types.handler(callback_type, meme_id, query_id, answer_query, inliner)
         case (page_type, page_str) if page_type.endswith('page'):
             pages.handler(ObjectType(page_type.removesuffix('page')), int(page_str), message_id, inliner)
-        case ('r' | 'rd' as command, meme_id) if inliner.database.rank in BOT_ADMINS:
+        case ('r' | 'rd' as command, meme_id) if inliner.database.rank in HIGH_LEVEL_ADMINS:
             delete_logs.handler(command, meme_id, message_id, query_id, answer_query, inliner)
         case (('rep_accept' | 'rep_dismiss') as command, meme_id) if inliner.database.rank != User.Rank.USER:
             try:
@@ -73,6 +72,8 @@ def handler(request, callback_query, user_chat_id):
                 )
                 inliner.database.save()
                 raise RequestInterruption()
+            finally:
+                inliner.unpin_chat_message(settings.MEME_REPORTS_CHANNEL, message_id)
             reports.handler(command, query_id, message_id, answer_query, report, inliner)
         case (command, target_id) if inliner.database.rank == User.Rank.OWNER:
             match command:

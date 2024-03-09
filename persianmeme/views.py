@@ -12,7 +12,7 @@ from LilSholex.exceptions import RequestInterruption
 
 @require_POST
 def webhook(request):
-    if request.META.get(settings.TELEGRAM_HEADER_NAME) != settings.WEBHOOK_TOKEN:
+    if not request.is_from_telegram:
         return HttpResponseForbidden()
     update = json.loads(request.body.decode())
     match update:

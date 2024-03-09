@@ -1,6 +1,6 @@
 FROM ubuntu:22.04
-ARG NGINX_VERSION=nginx-1.24.0
-ARG OPENSSL_VERSION=openssl-3.1.0
+ARG NGINX_VERSION=nginx-1.25.4
+ARG OPENSSL_VERSION=openssl-3.2.1
 # Compiling
 RUN apt update && DEBIAN_FRONTEND="noninteractive" apt install -y build-essential \
     libpcre3 libpcre3-dev zlib1g zlib1g-dev python3 python3-pip wget && apt autoremove -y && apt autoclean

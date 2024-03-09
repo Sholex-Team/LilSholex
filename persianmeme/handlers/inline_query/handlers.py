@@ -10,10 +10,10 @@ def handler(request, inline_query, user_chat_id):
     query = inline_query['query']
     offset = inline_query['offset']
     inline_query_id = inline_query['id']
-    user = User(request.http_session, User.Mode.SEND_AD, user_chat_id)
+    user = User(request.http_session, user_chat_id)
     user.upload_voice()
     if not user.database.started:
-        user.database.save()
+        user.database.save(update_fields=('last_usage_date',))
         answer_inline_query(
             inline_query_id,
             str(),
@@ -23,9 +23,8 @@ def handler(request, inline_query, user_chat_id):
             request.http_session
         )
         raise RequestInterruption()
-    user.send_ad()
     user.set_username()
-    user.database.save()
+    user.database.save(update_fields=('last_usage_date', 'started', 'last_start'))
     if user.database.status != UserClass.Status.FULL_BANNED:
         if len((splinted_query := query.split(settings.SEARCH_CAPTION_KEY, 1))) == 2:
             query, caption = splinted_query
