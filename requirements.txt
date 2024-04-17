@@ -16,7 +16,7 @@ chardet==5.2.0
 Django==5.0.3
 flower==2.0.1
 frozenlist==1.4.1
-gunicorn==21.2.0
+gunicorn==22.0.0
 humanize==4.9.0
 hyperlink==21.0.0
 incremental==22.10.0
