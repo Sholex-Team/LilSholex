@@ -10,7 +10,7 @@ autobahn==23.6.2
 Automat==22.10.0
 brotlipy==0.7.0
 celery==5.3.6
-certifi==2024.2.2
+certifi==2024.7.4
 cffi==1.16.0
 chardet==5.2.0
 Django==5.0.3
