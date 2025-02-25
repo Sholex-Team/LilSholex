@@ -23,11 +23,8 @@ A Project Containing Telegram API bots and small web apps .
    - `persianmeme_id`: Bot's numeric ID (used for identifying memes that are posted to the voting channel by the bot itself.)
 4. Create/Edit these configs:
    - `conf/admins.json`: JSON formatted file, containing list of admins to whom internal errors are sent.
-5. Replace {persianmeme_token} & {domain} inside conf/nginx.conf with
-   your domain and bot token
+5. Replace {domain} inside conf/nginx.conf with your domain.
 6. `docker stack deploy -c docker-compose.yml --with-registry-auth {stack name}`
-
-**Swarm health checks are included and containers will get replaced after running into a problem !**
 
 **If you have any questions about docker swarm or secrets checkout Docker official documentation about
 Docker swarm secrets: https://docs.docker.com/engine/swarm/secrets/**
