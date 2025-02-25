@@ -1,4 +1,8 @@
+import os
 from pathlib import Path
+from django.urls import reverse_lazy
+import json
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -8,22 +12,26 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRETS_PATH = Path('/run/secrets')
+CONFIGS_PATH = Path('/run/configs')
 with open(SECRETS_PATH / 'secret_key') as secret_file:
     SECRET_KEY = secret_file.read().removesuffix('\n')
 
 # PersianMeme
+with open(SECRETS_PATH / 'persianmeme_id') as persian_meme_id:
+    MEME_ID = int(persian_meme_id.read().strip())
 with open(SECRETS_PATH / 'persianmeme_token') as persian_meme_token:
-    MEME = persian_meme_token.read().removesuffix('\n')
+    MEME_TOKEN = persian_meme_token.read().strip()
+MEME_BASE_URL = f'https://api.telegram.org/bot{MEME_TOKEN}/'
 with open(SECRETS_PATH / 'persianmeme_channel') as persian_meme_channel:
-    MEME_CHANNEL = persian_meme_channel.read().removesuffix('\n')
+    MEME_CHANNEL = persian_meme_channel.read().strip()
 with open(SECRETS_PATH / 'persianmeme_logs') as persian_meme_logs:
-    MEME_LOGS = persian_meme_logs.read().removesuffix('\n')
+    MEME_LOGS = persian_meme_logs.read().strip()
 with open(SECRETS_PATH / 'persianmeme_messages') as persian_meme_messages:
-    MEME_MESSAGES = persian_meme_messages.read().removesuffix('\n')
+    MEME_MESSAGES = persian_meme_messages.read().strip()
 with open(SECRETS_PATH / 'persianmeme_help_messages') as persian_meme_help_messages:
-    MEME_HELP_MESSAGES = persian_meme_help_messages.read()
+    MEME_HELP_MESSAGES = json.load(persian_meme_help_messages)
 with open(SECRETS_PATH / 'persianmeme_reports') as persian_meme_reports:
-    MEME_REPORTS_CHANNEL = persian_meme_reports.read().removesuffix('\n')
+    MEME_REPORTS_CHANNEL = persian_meme_reports.read().strip()
 ID_KEY = 'id:'
 EMPTY_CAPTION_KEY = '@ '
 SEARCH_CAPTION_KEY = ' @ '
@@ -38,7 +46,7 @@ SENSITIVE_CHARACTERS = {'<', '>', '(', ')', '+', '*', '"', '@', '~', '%', '-'}
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 with open(SECRETS_PATH / 'domain') as domain_file:
-    ALLOWED_HOSTS = [domain_file.read().removesuffix('\n'), 'localhost']
+    ALLOWED_HOSTS = [domain_file.read().strip(), 'localhost']
 # Application definition
 
 INSTALLED_APPS = [
@@ -50,15 +58,55 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'persianmeme.apps.PersianmemeConfig'
 ]
+if os.getenv('BOT_WEBSERVER'):
+    MIDDLEWARE = [
+        'django.middleware.security.SecurityMiddleware',
+        'LilSholex.middleware.telegram_middleware',
+        'django.middleware.common.CommonMiddleware',
+    ]
 
-MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'LilSholex.middleware.TelegramMiddleware',
-    'LilSholex.middleware.CSessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'LilSholex.middleware.CAuthenticationMiddleware',
-    'LilSholex.middleware.CMessageMiddleware',
-]
+    # Logging
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': True,
+        'handlers': {
+            'mail': {
+                'level': 'ERROR',
+                'class': 'LilSholex.log.ThrottledEmailHandler',
+                'include_html': True
+            }
+        },
+        'loggers': {
+            'django': {
+                'level': os.getenv('DJANGO_LOG_LEVEL'),
+                'handlers': ('mail',),
+                'propagate': False
+            }
+        }
+    }
+    with open(CONFIGS_PATH / 'admins') as admins_file:
+        ADMINS = json.load(admins_file)
+    ERROR_REPORT_THROTTLE_TIME = 60  # In Seconds
+    ERROR_REPORT_THROTTLE_COUNT = 2
+    ERROR_REPORT_CACHE_KEY = 'ERROR_REPORT'
+    with open(SECRETS_PATH / 'email_config') as email_config_file:
+        email_config = json.load(email_config_file)
+        EMAIL_HOST = email_config['EMAIL_HOST']
+        EMAIL_PORT = email_config['EMAIL_PORT']
+        EMAIL_USE_TLS = email_config['EMAIL_USE_TLS']
+        EMAIL_HOST_USER = email_config['EMAIL_HOST_USER']
+        DEFAULT_FROM_EMAIL = email_config['DEFAULT_FROM_EMAIL']
+        EMAIL_HOST_PASSWORD = email_config['EMAIL_HOST_PASSWORD']
+    EMAIL_TIMEOUT = 3
+    SERVER_EMAIL = DEFAULT_FROM_EMAIL
+else:
+    MIDDLEWARE = [
+        'django.middleware.security.SecurityMiddleware',
+        'django.contrib.sessions.middleware.SessionMiddleware',
+        'django.middleware.common.CommonMiddleware',
+        'django.contrib.auth.middleware.AuthenticationMiddleware',
+        'django.contrib.messages.middleware.MessageMiddleware',
+    ]
 
 ROOT_URLCONF = 'LilSholex.urls'
 
@@ -88,7 +136,7 @@ with open(SECRETS_PATH / 'db_password') as db_password:
         'default': {
             'ENGINE': 'django.db.backends.mysql',
             'NAME': 'lilsholex',
-            'CONN_MAX_AGE': 28780,
+            'CONN_MAX_AGE': 120,
             'CONN_HEALTH_CHECKS': True,
             'USER': 'sholex',
             'PASSWORD': db_password.read().removesuffix('\n'),
@@ -147,7 +195,9 @@ MAX_FAKE_VOTE = 80
 MIN_FAKE_VOTE = 40
 
 # Timeouts
-REQUESTS_TIMEOUT = 0.7
+REQUESTS_TIMEOUT = 5
+MAX_REQUEST_COUNT = 20
+DNS_CACHE_TIME = 300
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.memcached.PyMemcacheCache',

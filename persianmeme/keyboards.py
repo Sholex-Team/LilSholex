@@ -1,5 +1,7 @@
 from .types import ObjectType
 from LilSholex.functions import emoji_number
+from asgiref.sync import sync_to_async
+
 admin = {'keyboard': [
     ['Add Meme', 'Delete Meme', 'Meme Count'],
     ['Ban a User', 'Unban a User', 'Full Ban'],
@@ -16,6 +18,7 @@ search_items = {'keyboard': [
     ['ویس ها 🔊', 'ویدئو ها 📹'], ['ویس ها 🔊 و ویدئو ها 📹'], ['بازگشت 🔙']
 ], 'resize_keyboard': True}
 user = {'keyboard': [
+    ['لغو رای‌گیری 🗳'],
     ['راهنما 🔰', 'گزارش تخلف 🛑'],
     ['درخواست حذف میم ✖', 'حمایت مالی 💸'],
     ['ویس ها 🔊', 'کانال رای‌گیری 🗳', 'ویدئو ها 📹'],
@@ -67,12 +70,18 @@ edit_meme = {'keyboard': [
     ['Done ✔'],
     ['Back 🔙']
 ], 'resize_keyboard': True}
+meme_review_type = {'keyboard': [
+    ['Both', 'Video', 'Voice'],
+    ['Back 🔙']
+], 'resize_keyboard': True}
 meme_review = {'keyboard': [
     ['Edit File', 'Edit Name', 'Edit Tags'],
     ['Edit Tags & Description'],
     ['Edit Description'],
     ['Delete 🗑', 'Check the Meme'],
-    ['Done ✔', 'Done and Next ⏭'], ['Back 🔙']
+    ['Done ✔', 'Done and Next ▶️'],
+    ['Skip ⏩'],
+    ['Back 🔙']
 ], 'resize_keyboard': True}
 deleted = {'inline_keyboard': [[{'text': 'Deleted 🗑', 'callback_data': 'none'}]]}
 recovered = {'inline_keyboard': [[{'text': 'Recovered ♻', 'callback_data': 'none'}]]}
@@ -137,6 +146,7 @@ def create_list_keyboard(objs: tuple, object_type: ObjectType, start: int):
     } for index, obj in enumerate(objs)]
 
 
+@sync_to_async
 def make_meme_list(voices):
     return {'inline_keyboard': [
         create_voice_list_keyboard(
@@ -145,6 +155,7 @@ def make_meme_list(voices):
     ]}
 
 
+@sync_to_async
 def make_list(obj_type: ObjectType, objs, prev_page: int, next_page: int):
     temp_keyboard = {'inline_keyboard': [
         create_list_keyboard(

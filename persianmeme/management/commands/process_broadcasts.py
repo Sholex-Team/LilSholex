@@ -10,7 +10,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         while True:
             db.close_old_connections()
-            broadcast = Broadcast.objects.filter(sent=False)
+            broadcast = Broadcast.objects.filter(sent=False).select_related('sender')
             if broadcast.exists():
                 self.stdout.write('Processing a broadcast.')
                 broadcast = broadcast.first()

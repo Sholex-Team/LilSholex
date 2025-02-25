@@ -1,14 +1,9 @@
 from django.contrib import admin
 from . import models
-from django.http import HttpResponse, HttpRequest
-from django.core.serializers import serialize
+from django.http import HttpRequest
 from .functions import fake_deny_vote
+
 change_permission = ('change',)
-
-
-@admin.display(description='Export as Json')
-def export_json(costume_admin, request, queryset):
-    return HttpResponse(serialize('json', queryset), content_type='application/json')
 
 
 @admin.display(description='Playlists Count')
@@ -107,7 +102,7 @@ class UserAdmin(admin.ModelAdmin):
     list_per_page = 15
     search_fields = ('user_id', 'chat_id')
     readonly_fields = ('user_id', 'date', 'last_usage_date')
-    actions = (unban_user, full_ban, ban_user, export_json)
+    actions = (unban_user, full_ban, ban_user)
     raw_id_fields = (
         'last_broadcast',
         'playlists',
@@ -133,40 +128,25 @@ class UserAdmin(admin.ModelAdmin):
             'report_violation_count'
         )}),
         ('Memes', {'fields': ('playlists',)}),
-        ('Temporary Values', {'fields': ('temp_meme_name', 'temp_user_id', 'temp_meme_tags')})
+        ('Temporary Values', {'fields': ('temp_meme_name', 'temp_user_id', 'temp_meme_tags', 'temp_meme_type')})
     )
     inlines = (UsernameInline, RecentMemeInline)
 
 
+@admin.register(models.NewMeme)
+class NewMemeAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'name', 'sender', 'type', 'status', 'visibility', 'usage_count'
+    )
+    list_filter = ('status', 'visibility', 'type')
+    search_fields = ('name', 'sender__chat_id', 'file_id', 'file_unique_id', 'id', 'sender__user_id', 'description')
+    list_per_page = 15
+    readonly_fields = ('id',)
+    raw_id_fields = ('sender', 'playlist_voice')
+
+
 @admin.register(models.Meme)
-class MemeAdmin(admin.ModelAdmin):
-    @admin.display(description='Accept Votes')
-    def accept_vote(self, request: HttpRequest, queryset):
-        result = [(target_meme, target_meme.accept()) for target_meme in queryset if target_meme.status == 'p']
-        result_len = len(result)
-        if result_len == 0:
-            self.message_user(request, 'There is no need to accept these memes !')
-        elif result_len == 1:
-            self.message_user(request, f'{result[0][0]} meme has been accepted !')
-        else:
-            self.message_user(request, f'{result_len} memes have been accepted !')
-
-    @admin.display(description='Deny Vote')
-    def deny_vote(self, request: HttpRequest, queryset):
-        result = [
-            (target_meme, target_meme.delete_vote(), target_meme.deny())
-            for target_meme in queryset if target_meme.status == 'p'
-        ]
-        result_len = len(result)
-        if result_len == 0:
-            self.message_user(request, 'There is no need to deny these memes !')
-        else:
-            queryset.delete()
-            if result_len == 1:
-                self.message_user(request, f'{result[0][0]} has been denied !')
-            else:
-                self.message_user(request, f'{result_len} memes have been denied !')
-
+class MemeAdmin(NewMemeAdmin):
     @admin.display(description='Add Fake Deny Votes')
     def add_fake_deny_votes(self, request: HttpRequest, queryset):
         if (faked_count := fake_deny_vote(queryset)) == 0:
@@ -175,7 +155,7 @@ class MemeAdmin(admin.ModelAdmin):
             self.message_user(request, 'Fake votes have been added to a meme !')
         else:
             self.message_user(request, f'Fake votes has been added to {faked_count} memes !')
-    
+
     @admin.display(description='Recover Memes')
     def recover_memes(self, request: HttpRequest, queryset):
         if not (recovered_memes_count := queryset.filter(status=models.Meme.Status.DELETED).update(
@@ -202,15 +182,11 @@ class MemeAdmin(admin.ModelAdmin):
     recover_memes.allowed_permissions = change_permission
     ban_senders.allowed_permissions = change_permission
     date_hierarchy = 'date'
-    list_display = (
-        'id', 'name', 'sender', 'type', 'status', 'usage_count', count_deny_votes, count_accept_votes
-    )
-    list_filter = ('status', 'visibility', 'reviewed', 'type', 'previous_status')
-    search_fields = ('name', 'sender__chat_id', 'file_id', 'file_unique_id', 'id', 'sender__user_id', 'description')
-    actions = (export_json, accept_vote, deny_vote, add_fake_deny_votes, recover_memes, ban_senders)
-    list_per_page = 15
-    readonly_fields = ('id', 'date')
-    raw_id_fields = ('sender', 'voters', 'accept_vote', 'deny_vote', 'review_admin')
+    list_display = (*NewMemeAdmin.list_display, count_deny_votes, count_accept_votes)
+    list_filter = (*NewMemeAdmin.list_filter, 'reviewed', 'previous_status')
+    actions = (add_fake_deny_votes, recover_memes, ban_senders)
+    readonly_fields = (*NewMemeAdmin.readonly_fields, 'date')
+    raw_id_fields = (*NewMemeAdmin.raw_id_fields, 'voters', 'accept_vote', 'deny_vote', 'review_admin')
     fieldsets = (
         ('Information', {'fields': (
             'id',
@@ -262,16 +238,21 @@ class BroadcastAdmin(admin.ModelAdmin):
     fieldsets = (('Information', {'fields': ('id', 'message_id', 'sender')}), ('Status', {'fields': ('sent',)}))
 
 
+@admin.register(models.PlaylistVoice)
+class PlaylistVoiceAdmin(admin.ModelAdmin):
+    list_display = ('id', 'playlist', 'voice')
+    search_fields = ('id', 'playlist__name', 'voice__name', 'voice__file_unique_id', 'playlist__invite_link')
+    list_per_page = 20
+    raw_id_fields = ('playlist', 'voice')
+
+
 @admin.register(models.Playlist)
 class PlaylistAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', count_voices, 'creator', 'date')
-    date_hierarchy = 'date'
+    list_display = ('id', 'name', count_voices, 'creator',)
     list_filter = ('creator__rank', 'creator__status')
     search_fields = ('name', 'id', 'creator__user_id', 'creator__chat_id')
     list_per_page = 15
-    readonly_fields = ('id', 'date')
-    raw_id_fields = ('voices', 'creator')
-    fieldsets = (('Information', {'fields': ('id', 'name', 'date', 'voices', 'creator')}),)
+    raw_id_fields = ('creator',)
 
 
 @admin.register(models.Message)

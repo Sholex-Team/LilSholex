@@ -1,14 +1,14 @@
-FROM ubuntu:22.04
-ARG NGINX_VERSION=nginx-1.25.4
-ARG OPENSSL_VERSION=openssl-3.2.1
+FROM ubuntu:24.04
+ARG NGINX_VERSION=nginx-1.26.3
+ARG OPENSSL_VERSION=openssl-3.4.1
 # Compiling
 RUN apt update && DEBIAN_FRONTEND="noninteractive" apt install -y build-essential \
     libpcre3 libpcre3-dev zlib1g zlib1g-dev python3 python3-pip wget && apt autoremove -y && apt autoclean
-RUN python3 -m pip install --no-cache-dir requests
+RUN python3 -m pip install --no-cache-dir --break-system-packages requests
 WORKDIR /root
 RUN wget https://nginx.org/download/$NGINX_VERSION.tar.gz && \
-    wget https://www.openssl.org/source/$OPENSSL_VERSION.tar.gz && tar -xf $NGINX_VERSION.tar.gz && \
-    tar -xf $OPENSSL_VERSION.tar.gz && cd $NGINX_VERSION && \
+    wget https://github.com/openssl/openssl/releases/download/$OPENSSL_VERSION/$OPENSSL_VERSION.tar.gz &&  \
+    tar -xf $NGINX_VERSION.tar.gz && tar -xf $OPENSSL_VERSION.tar.gz && cd $NGINX_VERSION && \
     ./configure --http-log-path=/var/log/nginx/access.log --error-log-path=/var/log/nginx/error.log \
     --pid-path=/var/run/nginx.pid --conf-path=/etc/nginx/nginx.conf --with-openssl-opt=enable-ktls \
     --without-http_fastcgi_module --without-http_uwsgi_module --with-pcre --with-openssl=../$OPENSSL_VERSION \

@@ -1,12 +1,16 @@
 from persianmeme.models import MemeType
-from persianmeme.classes import User
+from persianmeme.classes import User as UserClass
+from LilSholex.context import telegram as telegram_context
 
 
-def handler(text: str, message_id: int, user: User):
-    match text:
+async def handler():
+    user: UserClass = telegram_context.common.USER.get()
+    match telegram_context.message.TEXT.get():
         case 'ویس 🔊':
-            user.suggest_meme(MemeType.VOICE)
+            await user.suggest_meme(MemeType.VOICE)
         case 'ویدئو 📹':
-            user.suggest_meme(MemeType.VIDEO)
+            await user.suggest_meme(MemeType.VIDEO)
         case _:
-            user.send_message(user.translate('unknown_command'), reply_to_message_id=message_id)
+            await user.send_message(
+                user.translate('unknown_command'), reply_to_message_id=telegram_context.common.MESSAGE_ID.get()
+            )

@@ -1,15 +1,21 @@
-from persianmeme.functions import change_user_status
 from persianmeme.keyboards import admin
 from persianmeme.models import User
 from persianmeme.classes import User as UserClass
+from asyncio import TaskGroup
+from LilSholex.context import telegram as telegram_context
 
 
-def handler(text: str, user: UserClass, ban_mode: User.Status):
+async def handler(ban_mode: User.Status):
+    user: UserClass = telegram_context.common.USER.get()
     try:
-        user_id = int(text)
+        user_id = int(telegram_context.message.TEXT.get())
     except (ValueError, TypeError):
-        user.send_message(user.translate('invalid_user_id'))
+        await user.send_message(user.translate('invalid_user_id'))
     else:
         user.database.menu = User.Menu.ADMIN_MAIN
-        change_user_status(user_id, ban_mode)
-        user.send_message(user.translate('unbanned' if ban_mode is User.Status.ACTIVE else 'banned', user_id), admin)
+        async with TaskGroup() as tg:
+            tg.create_task(User.objects.filter(chat_id=user_id).aupdate(status=ban_mode))
+            tg.create_task(user.send_message(
+                user.translate('unbanned' if ban_mode is User.Status.ACTIVE else 'banned', user_id),
+                admin
+            ))

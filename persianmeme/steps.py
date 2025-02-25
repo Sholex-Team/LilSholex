@@ -1,6 +1,7 @@
 from . import translations
 from . import keyboards
 from .models import User
+
 admin_steps = {
     'main': {'menu': User.Menu.ADMIN_MAIN, 'message': translations.admin_messages['back'], 'keyboard': keyboards.admin},
     'voice_name': {
@@ -49,11 +50,18 @@ admin_steps = {
         'before': 'send_edit_meme',
         'callback': 'clear_temp_meme_tags'
     },
+    'meme_review_type': {
+        'menu': User.Menu.ADMIN_MEME_REVIEW_TYPE,
+        'message': translations.admin_messages['meme_type'],
+        'keyboard': keyboards.meme_review_type,
+        'before': 'main',
+        'callback': 'clear_current_meme'
+    },
     'meme_review': {
         'menu': User.Menu.ADMIN_MEME_REVIEW,
         'message': translations.admin_messages['review_the_meme'],
         'keyboard': keyboards.meme_review,
-        'before': 'main'
+        'before': 'meme_review_type'
     },
     'meme_type': {
         'menu': User.Menu.ADMIN_MEME_TYPE,
@@ -68,7 +76,8 @@ user_steps = {
         'menu': User.Menu.USER_PRIVATE_VOICES,
         'message': translations.user_messages['choose'],
         'keyboard': keyboards.manage_voice_list,
-        'before': 'main'
+        'before': 'main',
+        'callback': 'clear_current_meme'
     },
     'suggest_voice_name': {
         'menu': User.Menu.USER_SUGGEST_MEME_NAME,
@@ -127,13 +136,15 @@ user_steps = {
         'menu': User.Menu.USER_VOICE_SUGGESTIONS,
         'message': translations.user_messages['choose'],
         'keyboard': keyboards.voice_suggestions,
-        'before': 'manage_voices'
+        'before': 'manage_voices',
+        'callback': 'clear_current_meme'
     },
     'video_suggestions': {
         'menu': User.Menu.USER_VIDEO_SUGGESTIONS,
         'message': translations.user_messages['choose'],
         'keyboard': keyboards.video_suggestions,
-        'before': 'main'
+        'before': 'main',
+        'callback': 'clear_current_meme'
     },
     'manage_voices': {
         'menu': User.Menu.USER_MANAGE_VOICES,

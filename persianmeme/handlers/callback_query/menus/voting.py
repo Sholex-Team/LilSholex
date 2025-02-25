@@ -1,40 +1,55 @@
 from persianmeme.models import Meme, ADMINS, User
 from LilSholex.exceptions import RequestInterruption
 from persianmeme.translations import admin_messages
-from persianmeme.classes import User as UserClass
+from asyncio import TaskGroup
+from LilSholex.context import telegram as telegram_context
+from persianmeme import context as meme_context
+from LilSholex.functions import answer_callback_query
 
 
-def handler(vote_option: str, query_id: str, meme_id: int, answer_query, inliner: UserClass):
+async def handler():
     try:
-        meme = Meme.objects.get(id=meme_id, status=Meme.Status.PENDING)
+        meme = await Meme.objects.select_related('sender').aget(
+            id=meme_context.common.MEME_ID.get(), status=Meme.Status.PENDING
+        )
     except Meme.DoesNotExist:
         raise RequestInterruption()
-    match vote_option:
+    inliner = telegram_context.common.USER.get()
+    match meme_context.callback_query.VOTE_OPTION.get():
         case 'a':
             if inliner.database.rank in ADMINS and inliner.database.menu == User.Menu.ADMIN_GOD_MODE:
-                answer_query(
-                    query_id, admin_messages['admin_meme_accepted'].format(admin_messages[meme.type_string]), True
+                async with TaskGroup() as tg:
+                    tg.create_task(answer_callback_query(
+                        admin_messages['admin_meme_accepted'].format(admin_messages[meme.type_string]),
+                        True
+                    ))
+                    tg.create_task(meme.accept())
+            elif not await inliner.like_meme(meme):
+                await answer_callback_query(
+                    inliner.translate('vote_before', inliner.translate(meme.type_string)),
+                    True
                 )
-                meme.accept(inliner.session)
-            elif not inliner.like_meme(meme):
-                answer_query(query_id, inliner.translate('vote_before', inliner.translate(
-                    meme.type_string
-                )), True)
             else:
-                answer_query(query_id, inliner.translate('voted'), False)
+                await answer_callback_query(inliner.translate('voted'), False)
         case 'd':
             if inliner.database.rank in ADMINS and inliner.database.menu == User.Menu.ADMIN_GOD_MODE:
-                answer_query(
-                    query_id, admin_messages['admin_meme_denied'].format(admin_messages[meme.type_string]), True
+                async with TaskGroup() as tg:
+                    tg.create_task(answer_callback_query(
+                        admin_messages['admin_meme_denied'].format(admin_messages[meme.type_string]),
+                        True
+                    ))
+                    tg.create_task(meme.deny())
+            elif not await inliner.dislike_meme(meme):
+                await answer_callback_query(
+                    inliner.translate('vote_before', inliner.translate(meme.type_string)),
+                    True
                 )
-                meme.deny(inliner.session)
-            elif not inliner.dislike_meme(meme):
-                answer_query(query_id, inliner.translate('vote_before', inliner.translate(
-                    meme.type_string
-                )), True)
             else:
-                answer_query(query_id, inliner.translate('voted'), False)
+                await answer_callback_query(inliner.translate('voted'), False)
         case _:
-            answer_query(query_id, inliner.translate(
-                'voting_results', meme.accept_vote.count(), meme.deny_vote.count()
+            async with TaskGroup() as tg:
+                accept_count = tg.create_task(meme.accept_vote.acount())
+                deny_count = tg.create_task(meme.deny_vote.acount())
+            await answer_callback_query(inliner.translate(
+                'voting_results', accept_count.result(), deny_count.result()
             ), True, 180)

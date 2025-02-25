@@ -1,8 +1,7 @@
 from django.conf import settings
 from LilSholex import decorators
-from LilSholex.functions import answer_callback_query as answer_callback_query_closure
-from . import models
-from requests import Session as RequestsSession
+from LilSholex.functions import handle_request_exception
+from . import models, context as meme_context
 from .translations import user_messages
 from asgiref.sync import sync_to_async
 from aiohttp import ClientSession, TCPConnector, ClientError
@@ -11,71 +10,51 @@ import asyncio
 from django import db
 from .types import ObjectType
 import json
-from LilSholex.exceptions import TooManyRequests
 from random import randint
+from django.utils.html import escape
+from asyncio import TaskGroup
+from .keyboards import make_list
+from django.db import transaction
+from LilSholex.context import telegram as telegram_context
 
 
-def get_admin_voice(voice_id: int):
-    try:
-        return models.Meme.objects.get(id=voice_id)
-    except (models.Meme.DoesNotExist, ValueError):
-        return None
-
-
-def count_memes():
-    return f'All memes count : {models.Meme.objects.filter(status=models.Meme.Status.ACTIVE).count()}'
-
-
-def change_user_status(chat_id, status):
-    models.User.objects.filter(chat_id=chat_id).update(status=status)
-
-
-@decorators.sync_fix
-def answer_inline_query(
-        inline_query_id: str,
+@decorators.async_fix
+async def answer_inline_query(
         results: str,
         next_offset: str,
         switch_pm_text: str,
-        switch_pm_parameter: str,
-        session: RequestsSession
+        switch_pm_parameter: str
 ):
-    with session.get(
-        f'https://api.telegram.org/bot{settings.MEME}/answerInlineQuery',
+    async with telegram_context.common.HTTP_SESSION.get().get(
+        f'https://api.telegram.org/bot{settings.MEME_TOKEN}/answerInlineQuery',
         params={
             'results': results,
             'next_offset': next_offset,
             'switch_pm_text': switch_pm_text,
             'switch_pm_parameter': switch_pm_parameter,
-            'inline_query_id': inline_query_id,
+            'inline_query_id': telegram_context.inline_query.QUERY_ID.get(),
             'cache_time': 0
-        },
-        timeout=settings.REQUESTS_TIMEOUT
+        }
     ) as response:
-        if response.status_code != 429:
-            return
-        raise TooManyRequests(response.json()['parameters']['retry_after'])
+        await handle_request_exception(response)
 
 
-def answer_callback_query(session: RequestsSession):
-    return answer_callback_query_closure(session, settings.MEME)
-
-
-def get_delete(delete_id: int):
-    try:
-        return models.Delete.objects.get(id=delete_id)
-    except models.Delete.DoesNotExist:
-        return None
-
-
-@decorators.sync_fix
-def send_message(chat_id: int, text: str, session: RequestsSession = RequestsSession()):
-    with session.get(
-        f'https://api.telegram.org/bot{settings.MEME}/sendMessage',
+@decorators.async_fix
+async def send_message(chat_id: int, text: str):
+    async with telegram_context.common.HTTP_SESSION.get().get(
+        f'https://api.telegram.org/bot{settings.MEME_TOKEN}/sendMessage',
         params={'chat_id': chat_id, 'text': text}
     ) as response:
-        if response.status_code != 429:
-            return
-        raise TooManyRequests(response.json()['parameters']['retry_after'])
+        await handle_request_exception(response)
+
+
+@decorators.async_fix
+async def delete_vote(message_id: int):
+    async with telegram_context.common.HTTP_SESSION.get().get(
+        f'https://api.telegram.org/bot{settings.MEME_TOKEN}/deleteMessage',
+        params={'chat_id': settings.MEME_CHANNEL, 'message_id': message_id}
+    ) as response:
+        await handle_request_exception(response)
 
 
 @sync_to_async
@@ -92,7 +71,7 @@ def get_page(broadcast: models.Broadcast):
 
 
 async def perform_broadcast(broadcast: models.Broadcast):
-    from_chat_id = (await broadcast.get_sender).chat_id
+    from_chat_id = broadcast.sender.chat_id
     message_id = broadcast.message_id
     async with ClientSession(connector=TCPConnector(
             limit=settings.BROADCAST_CONNECTION_LIMIT
@@ -101,7 +80,7 @@ async def perform_broadcast(broadcast: models.Broadcast):
             while True:
                 try:
                     async with client.get(
-                        f'https://api.telegram.org/bot{settings.MEME}/copyMessage',
+                        f'https://api.telegram.org/bot{settings.MEME_TOKEN}/copyMessage',
                         params={'from_chat_id': from_chat_id, 'chat_id': chat_id, 'message_id': message_id}
                     ) as request_result:
                         if request_result.status != 429:
@@ -126,7 +105,7 @@ def make_result(meme: list, caption: str | None):
         temp_result['video_file_id'] = meme[1]
         temp_result['title'] = meme[2]
         if caption:
-            temp_result['caption'] = f'<b>{caption}</b>'
+            temp_result['caption'] = f'<b>{escape(caption)}</b>'
             temp_result['parse_mode'] = 'HTML'
             temp_result['description'] = caption
         elif meme[4]:
@@ -135,7 +114,7 @@ def make_result(meme: list, caption: str | None):
         temp_result['type'] = 'voice'
         temp_result['voice_file_id'] = meme[1]
         if caption:
-            temp_result['caption'] = f'<b>{caption}</b>'
+            temp_result['caption'] = f'<b>{escape(caption)}</b>'
             temp_result['parse_mode'] = 'HTML'
             temp_result['title'] = f'{meme[2]} ({caption})'
         else:
@@ -160,7 +139,7 @@ def make_meme_result(meme: models.Meme, caption: str | None):
         temp_result['video_file_id'] = meme.file_id
         temp_result['title'] = meme.name
         if caption:
-            temp_result['caption'] = f'<b>{caption}</b>'
+            temp_result['caption'] = f'<b>{escape(caption)}</b>'
             temp_result['parse_mode'] = 'HTML'
             temp_result['description'] = caption
         elif meme.description:
@@ -169,7 +148,7 @@ def make_meme_result(meme: models.Meme, caption: str | None):
         temp_result['type'] = 'voice'
         temp_result['voice_file_id'] = meme.file_id
         if caption:
-            temp_result['caption'] = f'<b>{caption}</b>'
+            temp_result['caption'] = f'<b>{escape(caption)}</b>'
             temp_result['parse_mode'] = 'HTML'
             temp_result['title'] = f'{meme.name} ({caption})'
         else:
@@ -185,6 +164,7 @@ def make_meme_like_result(meme: models.Meme, caption: str | None):
     return temp_result
 
 
+@sync_to_async
 def make_list_string(object_type: ObjectType, objs):
     if objs.exists():
         return '\n\n'.join([
@@ -202,11 +182,19 @@ def make_list_string(object_type: ObjectType, objs):
             return user_messages['empty_list']
 
 
-def paginate(objs, page: int):
+async def make_string_keyboard_list(object_type: ObjectType, objs, prev_page: int, next_page: int):
+    async with TaskGroup() as tg:
+        string_list = tg.create_task(make_list_string(object_type, objs))
+        keyboard_list = tg.create_task(make_list(object_type, objs, prev_page, next_page))
+    return string_list.result(), keyboard_list.result()
+
+
+def paginate(objs):
     paginator = Paginator(objs, 9)
     if not paginator.num_pages:
         return (), None, None
-    page = paginator.page(page) if page <= paginator.num_pages else paginator.page(paginator.num_pages)
+    page = paginator.page(page) if (page := meme_context.callback_query.PAGE.get()) <= paginator.num_pages \
+        else paginator.page(paginator.num_pages)
     return (
         page.object_list,
         page.previous_page_number() if page.has_previous() else None,
@@ -214,51 +202,39 @@ def paginate(objs, page: int):
     )
 
 
-def get_message(message_id: int):
+async def get_message():
     try:
-        target_message = models.Message.objects.select_related('sender').get(
-            id=message_id, status=models.Message.Status.PENDING
+        target_message = await models.Message.objects.select_related('sender').aget(
+            id=meme_context.callback_query.MESSAGE_ID.get(), status=models.Message.Status.PENDING
         )
     except models.Message.DoesNotExist:
         return False
     target_message.status = models.Message.Status.READ
-    target_message.save()
+    await target_message.asave(update_fields=('status',))
     return target_message
 
 
-@decorators.sync_fix
-def edit_message_reply_markup(
-        chat_id: int,
-        new_reply_markup: dict,
-        message_id: int = None,
-        inline_message_id: int = None,
-        session: RequestsSession = RequestsSession()
-):
-    assert message_id is not None or inline_message_id is not None,\
-        'You must at least provide message_id or inline_message_id !'
-    params = {'chat_id': chat_id, 'reply_markup': json.dumps(new_reply_markup)}
-    if message_id:
-        params['message_id'] = message_id
-    else:
-        params['inline_message_id'] = inline_message_id
-    with session.get(
-        f'https://api.telegram.org/bot{settings.MEME}/editMessageReplyMarkup',
-        timeout=(settings.REQUESTS_TIMEOUT * 20),
-        params=params
+@decorators.async_fix
+async def edit_message_reply_markup(chat_id: int, new_reply_markup: dict):
+    async with telegram_context.common.HTTP_SESSION.get().get(
+        f'https://api.telegram.org/bot{settings.MEME_TOKEN}/editMessageReplyMarkup',
+        params={
+            'chat_id': chat_id,
+            'reply_markup': json.dumps(new_reply_markup),
+            'message_id': telegram_context.common.MESSAGE_ID.get()
+        }
     ) as response:
-        if response.status_code != 429:
-            return
-        raise TooManyRequests(response.json()['parameters']['retry_after'])
+        await handle_request_exception(response)
 
 
-def check_for_voice(message: dict):
-    return 'voice' in message and (
+def check_for_voice():
+    return 'voice' in (message := telegram_context.message.MESSAGE.get()) and (
             'mime_type' not in message['voice'] or message['voice']['mime_type'] == 'audio/ogg'
     )
 
 
-def check_for_video(message: dict, bypass_limits: bool):
-    return 'video' in message and (
+def check_for_video(bypass_limits: bool):
+    return 'video' in (message := telegram_context.message.MESSAGE.get()) and (
         'mime_type' not in (video := message['video']) or video['mime_type'] == 'video/mp4'
     ) and (bypass_limits or (video['file_size'] <= settings.VIDEO_SIZE_LIMIT and
                              video['duration'] <= settings.VIDEO_DURATION_LIMIT))
@@ -309,3 +285,17 @@ def handle_message_params(
         )
     if parse_mode:
         message['parse_mode'] = parse_mode
+
+
+@sync_to_async
+def set_meme_message_id(meme_id: int, message_id: int) -> bool:
+    with transaction.atomic():
+        try:
+            meme = models.Meme.objects.select_for_update(of=('self', 'newmeme_ptr')).get(
+                id=meme_id, status=models.Meme.Status.PENDING
+            )
+        except models.Meme.DoesNotExist:
+            return False
+        meme.message_id = message_id
+        meme.save(update_fields=('message_id',))
+        return True

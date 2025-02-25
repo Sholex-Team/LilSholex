@@ -1,20 +1,22 @@
 from persianmeme.keyboards import settings
 from persianmeme.models import User
 from persianmeme.classes import User as UserClass
+from LilSholex.context import telegram as telegram_context
 
 
-def handler(text: str, message_id: int, user: UserClass):
-    match text:
+async def handler():
+    user: UserClass = telegram_context.common.USER.get()
+    match text := telegram_context.message.TEXT.get():
         case 'روشن 🔛' | 'خاموش 🔴':
             user.database.back_menu = 'main'
             user.database.menu = User.Menu.USER_SETTINGS
             if text == 'روشن 🔛':
                 user.database.vote = True
-                user.send_message(user.translate('voting_on'), settings)
+                await user.send_message(user.translate('voting_on'), settings)
             else:
                 user.database.vote = False
-                user.send_message(user.translate('voting_off'), settings)
+                await user.send_message(user.translate('voting_off'), settings)
         case _:
-            user.send_message(
-                user.translate('unknown_command'), reply_to_message_id=message_id
+            await user.send_message(
+                user.translate('unknown_command'), reply_to_message_id=telegram_context.common.MESSAGE_ID.get()
             )

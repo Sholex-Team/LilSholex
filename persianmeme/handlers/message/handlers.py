@@ -1,19 +1,24 @@
 from persianmeme import models, classes, keyboards
 from LilSholex.exceptions import RequestInterruption
-from .menus import start, admin_handler, user_handler
-from django.utils.html import escape
+from .menus import start, admin_handler, user_handler, cancel_voting
+from asyncio import TaskGroup
+from LilSholex.context import telegram as telegram_context
 
 
-def handler(request, message: dict, user_chat_id: int):
-    if text := message.get('text'):
-        text = escape(text)
+async def handler():
+    message = telegram_context.message.MESSAGE.get()
+    text = message.get('text')
     message_id = message['message_id']
-    user = classes.User(request.http_session, user_chat_id)
-    user.set_username()
+    telegram_context.common.MESSAGE_ID.set(message_id)
+    user = classes.User()
+    await user.set_database_instance()
+    await user.set_username()
     user.database.started = True
     if text in ('بازگشت 🔙', 'Back 🔙'):
-        user.go_back()
+        await user.go_back()
         raise RequestInterruption()
+    telegram_context.common.USER.set(user)
+    telegram_context.message.TEXT.set(text)
     match user.database:
         case models.User(rank=(
             user.database.Rank.OWNER | user.database.Rank.ADMIN | user.database.Rank.KHIAR
@@ -22,24 +27,28 @@ def handler(request, message: dict, user_chat_id: int):
                 user.menu_cleanup()
                 user.database.menu_mode = user.database.MenuMode.ADMIN
                 user.database.menu = models.User.Menu.ADMIN_MAIN
-                user.send_message(user.translate('admin_panel'), keyboards.admin, message_id)
-                user.database.save()
+                async with TaskGroup() as tg:
+                    tg.create_task(user.send_message(user.translate('admin_panel'), keyboards.admin, message_id))
+                    tg.create_task(user.database.asave())
                 raise RequestInterruption()
             else:
                 user.menu_cleanup()
                 user.database.menu_mode = user.database.MenuMode.USER
                 user.database.menu = models.User.Menu.USER_MAIN
-                user.send_message(user.translate('user_panel'), keyboards.user, message_id)
-                user.database.save()
+                async with TaskGroup() as tg:
+                    tg.create_task(user.send_message(user.translate('user_panel'), keyboards.user, message_id))
+                    tg.create_task(user.database.asave())
                 raise RequestInterruption()
         case _ if text and text.startswith('/start'):
-            start.handler(text, user, message_id)
+            await start.handler()
+        case _ if text and text.startswith('/cancelvoting'):
+            await cancel_voting.handler()
         case models.User(
             rank=(user.database.Rank.OWNER | user.database.Rank.ADMIN | user.database.Rank.KHIAR),
             menu_mode=user.database.MenuMode.ADMIN
         ):
-            admin_handler.handler(message, text, message_id, user)
+            await admin_handler.handler()
         case models.User(status=user.database.Status.ACTIVE, rank=models.User.Rank.USER) | \
                 models.User(status=models.User.Status.ACTIVE, menu_mode=models.User.MenuMode.USER):
-            user_handler.handler(message, text, message_id, user)
-    user.database.save()
+            await user_handler.handler()
+    await user.database.asave()

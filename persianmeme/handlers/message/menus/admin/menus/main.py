@@ -1,98 +1,110 @@
-from persianmeme import functions, keyboards
+from persianmeme import keyboards
 from persianmeme.classes import User as UserClass
-from persianmeme.models import User, HIGH_LEVEL_ADMINS, Delete
+from persianmeme.models import User, HIGH_LEVEL_ADMINS, Delete, Meme
 from persianmeme.translations import admin_messages
+from LilSholex.context import telegram as telegram_context
 
 
-def handler(message: dict, text: str, user: UserClass, message_id: int):
+async def handler():
+    user: UserClass = telegram_context.common.USER.get()
     user.database.back_menu = 'main'
     not_matched = False
+    text: str = telegram_context.message.TEXT.get()
+    message_id: int = telegram_context.common.MESSAGE_ID.get()
     match text:
         case 'Add Meme':
             user.database.menu = User.Menu.ADMIN_MEME_TYPE
-            user.send_message(admin_messages['meme_type'], keyboards.en_meme_type)
+            await user.send_message(admin_messages['meme_type'], keyboards.en_meme_type)
         case 'Meme Count':
-            user.send_message(functions.count_memes())
+            await user.send_message(
+                f'All memes count : {await Meme.objects.filter(status=Meme.Status.ACTIVE).acount()}'
+            )
         case 'Member Count':
-            user.send_message(user.translate('member_count', User.objects.count()))
+            await user.send_message(user.translate('member_count', await User.objects.acount()))
         case 'God Mode':
             user.database.menu = User.Menu.ADMIN_GOD_MODE
-            user.send_message(admin_messages['god_mode'], keyboards.en_back, message_id)
+            await user.send_message(admin_messages['god_mode'], keyboards.en_back, message_id)
         case _:
-            if (search_result := user.get_public_meme(message)) is False:
+            if (search_result := await user.get_public_meme()) is False:
                 not_matched = True
             elif search_result:
-                user.send_message(
+                await user.send_message(
                     user.translate(
                         'meme_info', user.translate(search_result.type_string), search_result.name
                     ),
-                    keyboards.use(search_result.id)
+                    keyboards.use(search_result.newmeme_ptr_id),
+                    message_id
                 )
     if not_matched and user.database.rank in HIGH_LEVEL_ADMINS:
         match text:
             case 'Get User':
                 user.database.menu = User.Menu.ADMIN_GET_USER
-                user.send_message(admin_messages['chat_id'], keyboards.en_back)
+                await user.send_message(admin_messages['chat_id'], keyboards.en_back)
             case 'Ban a User':
                 user.database.menu = User.Menu.ADMIN_BAN_USER
-                user.send_message(admin_messages['chat_id'], keyboards.en_back)
+                await user.send_message(admin_messages['chat_id'], keyboards.en_back)
             case 'Unban a User':
                 user.database.menu = User.Menu.ADMIN_UNBAN_USER
-                user.send_message(admin_messages['chat_id'], keyboards.en_back)
+                await user.send_message(admin_messages['chat_id'], keyboards.en_back)
             case 'Full Ban':
                 user.database.menu = User.Menu.ADMIN_FULL_BAN_USER
-                user.send_message(admin_messages['chat_id'], keyboards.en_back)
+                await user.send_message(admin_messages['chat_id'], keyboards.en_back)
             case 'Delete Meme':
                 user.database.menu = User.Menu.ADMIN_DELETE_MEME
-                user.send_message(admin_messages['meme'], keyboards.en_back)
+                await user.send_message(admin_messages['meme'], keyboards.en_back)
             case 'Ban Vote':
                 user.database.menu = User.Menu.ADMIN_BAN_VOTE
-                user.send_message(admin_messages['meme'], keyboards.en_back)
+                await user.send_message(admin_messages['meme'], keyboards.en_back)
             case 'Edit Meme':
                 user.database.menu = User.Menu.ADMIN_SEND_EDIT_MEME
-                user.send_message(
+                await user.send_message(
                     admin_messages['send_edit_meme'], keyboards.en_back
                 )
             case 'File ID':
                 user.database.menu = User.Menu.ADMIN_FILE_ID
-                user.send_message(admin_messages['send_document'], keyboards.en_back)
-            case 'Meme Review' if user.assign_meme():
-                user.database.menu = User.Menu.ADMIN_MEME_REVIEW
+                await user.send_message(admin_messages['send_document'], keyboards.en_back)
+            case 'Meme Review':
+                user.clear_temp_meme_type()
+                user.database.menu = User.Menu.ADMIN_MEME_REVIEW_TYPE
+                await user.send_message(
+                    admin_messages['meme_review_type'].format(*await user.unreviewed_memes_count),
+                    keyboards.meme_review_type,
+                    message_id
+                )
             case _ if user.database.rank == user.database.Rank.OWNER:
                 match text:
                     case 'Message User':
                         user.database.menu = User.Menu.ADMIN_MESSAGE_USER_ID
-                        user.send_message(admin_messages['chat_id'], keyboards.en_back)
+                        await user.send_message(admin_messages['chat_id'], keyboards.en_back)
                     case 'Delete Requests':
-                        if (delete_requests := Delete.objects.all()).exists():
-                            for delete_request in delete_requests:
-                                delete_request.meme.send_meme(
+                        if await (delete_requests := Delete.objects.all().select_related('meme', 'user')).aexists():
+                            async for delete_request in delete_requests:
+                                await delete_request.meme.send_meme(
                                     user.database.chat_id,
-                                    user.session,
                                     keyboards.delete_voice(delete_request.id),
                                     f'<b>From</b>: <code>{delete_request.user.chat_id}</code>\n\n'
                                 )
-                            user.send_message(
+                            await user.send_message(
                                 admin_messages['delete_requests'],
                                 reply_to_message_id=message_id
                             )
                         else:
-                            user.send_message(
+                            await user.send_message(
                                 admin_messages['no_delete_requests'],
                                 reply_to_message_id=message_id
                             )
                     case 'Broadcast':
                         user.database.menu = User.Menu.ADMIN_BROADCAST
-                        user.send_message(admin_messages['broadcast'], keyboards.en_back)
+                        await user.send_message(admin_messages['broadcast'], keyboards.en_back)
                     case 'Messages':
-                        user.send_messages()
+                        await user.send_messages()
                     case 'Started Count':
-                        user.send_message(user.translate(
+                        await user.send_message(user.translate(
                             'started_count',
-                            User.objects.filter(
+                            await User.objects.filter(
                                 started=True, status=User.Status.ACTIVE
-                            ).count()
+                            ).acount()
                         ), reply_to_message_id=message_id)
                     case 'Broadcast Status':
                         user.database.menu = User.Menu.ADMIN_BROADCAST_STATUS
-                        user.send_message(admin_messages['broadcast_id'], keyboards.en_back)
+                        await user.send_message(admin_messages['broadcast_id'], keyboards.en_back)

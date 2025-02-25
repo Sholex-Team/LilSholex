@@ -18,10 +18,14 @@ A Project Containing Telegram API bots and small web apps .
    - `dhparam`: SSL dhparam
    - `domain`: Your Domain
    - `webhook_token`: Security token which Telegram will include in its webhook requests headers
-   - `persianmeme_help_messages`: A JSON file containing help messages and animations
-4. Replace {persianmeme_token} & {domain} inside conf/nginx.conf with
+   - `secrets/help_messages.json`: A JSON formatted file, containing help messages and animations
+   - `secrets/email_config.json`: A JSON formatted file, containing error reporting email config.
+   - `persianmeme_id`: Bot's numeric ID (used for identifying memes that are posted to the voting channel by the bot itself.)
+4. Create/Edit these configs:
+   - `conf/admins.json`: JSON formatted file, containing list of admins to whom internal errors are sent.
+5. Replace {persianmeme_token} & {domain} inside conf/nginx.conf with
    your domain and bot token
-5. `docker stack deploy -c docker-compose.yml {stack name}`
+6. `docker stack deploy -c docker-compose.yml --with-registry-auth {stack name}`
 
 **Swarm health checks are included and containers will get replaced after running into a problem !**
 

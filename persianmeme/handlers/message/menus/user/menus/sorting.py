@@ -1,10 +1,12 @@
 from persianmeme.keyboards import settings
 from persianmeme.models import User
 from persianmeme.classes import User as UserClass
+from LilSholex.context import telegram as telegram_context
 
 
-def handler(text: str, message_id: int, user: UserClass):
-    match text:
+async def handler():
+    user: UserClass = telegram_context.common.USER.get()
+    match text := telegram_context.message.TEXT.get():
         case (
             'جدید به قدیم' |
             'قدیم به جدید' |
@@ -15,7 +17,7 @@ def handler(text: str, message_id: int, user: UserClass):
         ):
             user.database.back_menu = 'main'
             user.database.menu = User.Menu.USER_SETTINGS
-            user.send_message(user.translate('ordering_changed'), settings)
+            await user.send_message(user.translate('ordering_changed'), settings)
             match text:
                 case 'جدید به قدیم':
                     user.database.meme_ordering = user.database.Ordering.new_meme_id
@@ -30,4 +32,6 @@ def handler(text: str, message_id: int, user: UserClass):
                 case 'کم استفاده به پر استفاده':
                     user.database.meme_ordering = user.database.Ordering.low_usage
         case _:
-            user.send_message(user.translate('unknown_command'), reply_to_message_id=message_id)
+            await user.send_message(
+                user.translate('unknown_command'), reply_to_message_id=telegram_context.common.MESSAGE_ID.get()
+            )

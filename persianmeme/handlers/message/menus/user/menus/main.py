@@ -1,59 +1,74 @@
-from json import loads
 from django.conf import settings
 from persianmeme import keyboards
 from persianmeme.models import User
 from persianmeme.classes import User as UserClass
 from persianmeme.translations import user_messages
+from LilSholex.context import telegram as telegram_context
 
 
-def handler(message: dict, text: str, message_id: int, user: UserClass):
+async def handler():
+    user: UserClass = telegram_context.common.USER.get()
     user.database.back_menu = 'main'
-    match text:
+    match telegram_context.message.TEXT.get():
+        case 'لغو رای‌گیری 🗳':
+            user.database.menu = User.Menu.USER_CANCEL_VOTING
+            await user.send_message(
+                user_messages['meme_type'], keyboards.per_meme_type, telegram_context.common.MESSAGE_ID.get()
+            )
         case 'راهنما 🔰':
             user.database.menu = User.Menu.USER_HELP
-            user.send_message(
+            await user.send_message(
                 user.translate('help'),
-                keyboards.help_keyboard(list(loads(settings.MEME_HELP_MESSAGES).keys()))
+                keyboards.help_keyboard(list(settings.MEME_HELP_MESSAGES.keys()))
             )
         case 'گزارش تخلف 🛑':
             user.database.menu = User.Menu.USER_REPORT_MEME
-            user.send_message(user_messages['send_target_meme'], keyboards.per_back, message_id)
+            await user.send_message(
+                user_messages['send_target_meme'], keyboards.per_back, telegram_context.common.MESSAGE_ID.get()
+            )
         case 'حمایت مالی 💸':
-            user.send_message(user.translate('donate'), reply_to_message_id=message_id, parse_mode='Markdown')
+            await user.send_message(
+                user.translate('donate'),
+                reply_to_message_id=telegram_context.common.MESSAGE_ID.get(),
+                parse_mode='Markdown'
+            )
         case 'کانال رای‌گیری 🗳':
-            user.send_message(user.translate('voting_channel'), keyboards.voting_channel, message_id)
+            await user.send_message(
+                user.translate('voting_channel'), keyboards.voting_channel, telegram_context.common.MESSAGE_ID.get()
+            )
         case 'آخرین میم ها 🆕':
-            user.send_ordered_meme_list(user.database.Ordering.new_meme_id)
+            await user.send_ordered_meme_list(user.database.Ordering.new_meme_id)
         case 'ارتباط با مدیریت 📬':
-            if user.sent_message:
-                user.send_message(user.translate('pending_message'))
+            if await user.sent_message:
+                await user.send_message(user.translate('pending_message'))
             else:
                 user.database.menu = User.Menu.USER_CONTACT_ADMIN
-                user.send_message(user.translate('send_message'), keyboards.per_back)
+                await user.send_message(user.translate('send_message'), keyboards.per_back)
         case 'ویس ها 🔊':
             user.database.menu = User.Menu.USER_MANAGE_VOICES
-            user.send_message(user.translate('choose'), keyboards.manage_voices)
+            await user.send_message(user.translate('choose'), keyboards.manage_voices)
         case 'ویدئو ها 📹':
             user.database.menu = User.Menu.USER_VIDEO_SUGGESTIONS
-            user.send_message(user.translate('choose'), keyboards.video_suggestions)
+            await user.send_message(user.translate('choose'), keyboards.video_suggestions)
         case 'میم های محبوب 👌':
-            user.send_ordered_meme_list(user.database.Ordering.high_votes)
+            await user.send_ordered_meme_list(user.database.Ordering.high_votes)
         case 'پر استفاده ها ⭐':
-            user.send_ordered_meme_list(user.database.Ordering.high_usage)
+            await user.send_ordered_meme_list(user.database.Ordering.high_usage)
         case 'درخواست حذف میم ✖':
-            if user.database.delete_user.exists():
-                user.send_message(user.translate('pending_request'))
+            if await user.database.delete_user.aexists():
+                await user.send_message(user.translate('pending_request'))
             else:
                 user.database.menu = User.Menu.USER_DELETE_REQUEST
-                user.send_message(user.translate('meme'), keyboards.per_back)
+                await user.send_message(user.translate('meme'), keyboards.per_back)
         case 'تنظیمات ⚙':
             user.database.menu = User.Menu.USER_SETTINGS
-            user.send_message(user.translate('settings'), keyboards.settings)
+            await user.send_message(user.translate('settings'), keyboards.settings)
         case _:
-            if (search_result := user.get_public_meme(message)) is False:
-                user.send_message(user.translate('unknown_command'))
+            if (search_result := await user.get_public_meme()) is False:
+                await user.send_message(user.translate('unknown_command'))
             elif search_result:
-                user.send_message(
+                await user.send_message(
                     user.translate('meme_info', user.translate(search_result.type_string), search_result.name),
-                    keyboards.use(search_result.id)
+                    keyboards.use(search_result.newmeme_ptr_id),
+                    telegram_context.common.MESSAGE_ID.get()
                 )

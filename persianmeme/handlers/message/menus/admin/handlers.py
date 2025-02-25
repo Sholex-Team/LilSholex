@@ -22,61 +22,76 @@ from .menus import (
     edit_meme_tags,
     edit_meme_tags_and_description,
     edit_meme_description,
-    edit_meme_file
+    edit_meme_file,
+    meme_review_type
 )
+from LilSholex.context import telegram as telegram_context
+from persianmeme import context as meme_context
 
 
-def handler(message: dict, text: str, message_id: int, user: UserClass):
+async def handler():
+    user: UserClass = telegram_context.common.USER.get()
     match user.database.menu:
         case User.Menu.ADMIN_MAIN:
-            main.handler(message, text, user, message_id)
-        case User.Menu.ADMIN_MEME_NAME if text:
-            meme_name.handler(message, text, user)
+            await main.handler()
+        case User.Menu.ADMIN_MEME_NAME:
+            if await user.validate_meme_name(user.database.temp_meme_type):
+                await meme_name.handler()
         case User.Menu.ADMIN_MEME_TAGS:
-            meme_tags.handler(text, user)
+            if await user.process_meme_tags():
+                await meme_tags.handler()
         case User.Menu.ADMIN_NEW_MEME:
-            new_meme.handler(message, user)
+            await new_meme.handler()
         case User.Menu.ADMIN_DELETE_MEME:
-            delete_meme.handler(message, user, message_id)
+            await delete_meme.handler()
         case User.Menu.ADMIN_BAN_USER:
-            ban_user.handler(text, user, User.Status.BANNED)
+            await ban_user.handler(User.Status.BANNED)
         case User.Menu.ADMIN_UNBAN_USER:
-            ban_user.handler(text, user, User.Status.ACTIVE)
+            await ban_user.handler(User.Status.ACTIVE)
         case User.Menu.ADMIN_FULL_BAN_USER:
-            ban_user.handler(text, user, User.Status.FULL_BANNED)
+            await ban_user.handler(User.Status.FULL_BANNED)
         case User.Menu.ADMIN_MESSAGE_USER_ID:
-            message_user_id.handler(text, user)
+            await message_user_id.handler()
         case User.Menu.ADMIN_MESSAGE_USER:
-            message_user.handler(message_id, user)
+            await message_user.handler()
         case User.Menu.ADMIN_GET_USER:
-            get_user.handler(text, user, message_id)
+            await get_user.handler()
         case User.Menu.ADMIN_BROADCAST:
-            broadcast.handler(message_id, user)
-        case User.Menu.ADMIN_BAN_VOTE if target_vote := user.get_vote(message):
-            ban_vote.handler(target_vote, user)
-        case User.Menu.ADMIN_SEND_EDIT_MEME if target_meme := user.get_public_meme(message):
-            send_edit_meme.handler(target_meme, user)
+            await broadcast.handler()
+        case User.Menu.ADMIN_BAN_VOTE:
+            if target_vote := await user.get_vote():
+                meme_context.common.MEME.set(target_vote)
+                await ban_vote.handler()
+        case User.Menu.ADMIN_SEND_EDIT_MEME:
+            if target_meme := await user.get_public_meme():
+                meme_context.common.MEME.set(target_meme)
+                await send_edit_meme.handler()
         case User.Menu.ADMIN_EDIT_MEME:
-            edit_meme.handler(text, message_id, user)
-        case User.Menu.ADMIN_EDIT_MEME_NAME if user.validate_meme_name(
-                message, text, user.database.current_meme.type
-        ):
-            edit_meme_name.handler(text, user)
-        case User.Menu.ADMIN_EDIT_MEME_TAGS if user.process_meme_tags(text):
-            edit_meme_tags.handler(user)
-        case User.Menu.ADMIN_EDIT_MEME_TAGS_AND_DESCRIPTION if user.process_meme_tags(text):
-            edit_meme_tags_and_description.handler(user)
-        case User.Menu.ADMIN_EDIT_MEME_DESCRIPTION if user.validate_meme_description(
-                text, message_id, user.database.current_meme.type
-        ):
-            edit_meme_description.handler(text, user)
+            if await user.check_current_meme():
+                await edit_meme.handler()
+        case User.Menu.ADMIN_EDIT_MEME_NAME:
+            if await user.check_current_meme() and await user.validate_meme_name(user.database.current_meme.type):
+                await edit_meme_name.handler()
+        case User.Menu.ADMIN_EDIT_MEME_TAGS:
+            if await user.process_meme_tags():
+                await edit_meme_tags.handler()
+        case User.Menu.ADMIN_EDIT_MEME_TAGS_AND_DESCRIPTION:
+            if await user.process_meme_tags():
+                await edit_meme_tags_and_description.handler()
+        case User.Menu.ADMIN_EDIT_MEME_DESCRIPTION:
+            if await user.check_current_meme() and await user.validate_meme_description():
+                await edit_meme_description.handler()
         case User.Menu.ADMIN_EDIT_MEME_FILE:
-            edit_meme_file.handler(message, user)
+            if await user.check_current_meme():
+                await edit_meme_file.handler()
         case User.Menu.ADMIN_FILE_ID:
-            file_id.handler(message, message_id, user)
+            await file_id.handler()
+        case User.Menu.ADMIN_MEME_REVIEW_TYPE:
+            await meme_review_type.handler()
         case User.Menu.ADMIN_MEME_REVIEW:
-            meme_review.handler(text, message_id, user)
+            if await user.check_current_meme():
+                await meme_review.handler()
         case User.Menu.ADMIN_BROADCAST_STATUS:
-            broadcast_status.handler(text, message_id, user)
+            await broadcast_status.handler()
         case User.Menu.ADMIN_MEME_TYPE:
-            meme_type.handler(text, user)
+            await meme_type.handler()

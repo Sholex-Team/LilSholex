@@ -80,6 +80,7 @@ admin_messages = {
     'no_meme_to_review': 'There isn\'t any meme requiring a review !',
     'reviewed': '{0} has been reviewed ✅',
     'meme_not_accessible': 'Requested meme is not accessible anymore !',
+    'playlist_not_accessible': 'Requested playlist is not accessible anymore !',
     'meme_recovered': '{0} has been recovered ♻',
     'deleted_meme_recovered': 'Deleted {0} <b>{1}</b> has been recovered by the owner ♻',
     'voting_results': 'Voting Results 👇\n\n✅ : {0}\n❌ : {1}\n\nResults get updated every 3 minutes 🔄',
@@ -93,7 +94,8 @@ admin_messages = {
     'report_dismissed': 'Report has been dismissed ✔',
     'description': '<b>Description</b>: <code>{0}</code>\n\n',
     'meme_already_processed': 'Meme was already processed ✔',
-    'god_mode': 'God Mode Activated 🔛\n\nUse Back 🔙 button to disable it.'
+    'god_mode': 'God Mode Activated 🔛\n\nUse Back 🔙 button to disable it.',
+    'meme_review_type': 'There are {0} unreviewed memes in total.\n\n{1} Videos\n{2} Voices'
 }
 user_messages = {
     'back': 'شما به منوی اصلی بازگشتید 🔙',
@@ -103,7 +105,7 @@ user_messages = {
     'voted': 'رای شما ثبت شد ✔️',
     'donate': '''برای حمایت مالی از ما می توانید از روش های زیر استفاده کنید 👇
     
-    TON : `EQACYOxZgT94vwSqUq77YJzLCRKxA7JW4W60AM8ZT3k6_eG5`
+    TON : `UQBEqF_eXEuZqh-eAi4LBhkTDz4uviNKlUNGBJ8Wep51jlDD`
 
     از حمایت های شما مچکریم 🙏''',
     'managing_playlist': 'مدیریت پلی لیست ⚙️',
@@ -139,7 +141,9 @@ user_messages = {
     'meme_not_found': 'نتونستم این {0} رو پیدا کنم ☹',
     'message_sent': 'پیام شما به مدیریت ارسال شد ✔',
     'invalid_meme_name': 'نام {0} معتبر نیست ❌\nنام باید متن ساده و حداکثر ۸۰ کارکتر باشد !',
-    'meme_added': '{0} شما برای تایید به کانال رای گیری ارسال شد 👇\n🆔 @PersianMemeOfficial',
+    'meme_added': '{0} شما برای تایید به کانال رای گیری ارسال شد 👇\n🆔 @PersianMemeOfficial'
+                    '\n\n⚠️ جهت لغو رای‌گیری و حذف میم از کانال، از دکمه‌ی لغو رای‌گیری و یا دستور /cancelvoting '
+                    'استفاده کنید.',
     'meme_already_exists': 'این میم در ربات موجود میباشد ⚠',
     'meme_deleted': '{0} شما با موفقیت حذف شد 🗑',
     'meme_is_not_yours': '{0} متعلق به شما نبوده و یا در ربات موجود نمیباشد ❌',
@@ -191,6 +195,7 @@ user_messages = {
     'voice_deleted_from_list_before': 'ویس مورد نظر قبلا از لیست حذف شده است ⚠',
     'no_voting': 'شما هیچ {0} در مرحله ی رای گیری ندارید ⚠',
     'meme_not_accessible': 'میم مورد نظر دیگر در دسترس نیست ⚠',
+    'playlist_not_accessible': 'پلی لیست مورد نظر دیگر در دسترس نیست ⚠️',
     'voting_results': 'نتایج رای گیری 👇\n\n✅ : {0}\n❌ : {1}\n\nنتایج هر ۳ دقیقه به روزرسانی می شوند 🔄',
     'voice': 'ویس',
     'video': 'ویدئو',

@@ -1,7 +1,7 @@
 version: "3.8"
 services:
   db:
-    image: mysql:8.3.0
+    image: mysql:9.2.0
     environment:
         MYSQL_ROOT_PASSWORD_FILE: "/run/secrets/db_password"
         MYSQL_PASSWORD_FILE: "/run/secrets/db_password"
@@ -44,10 +44,10 @@ services:
         source: db
         target: /var/lib/mysql
     configs:
-      - source: mysql_3
+      - source: mysql_13
         target: /etc/mysql/conf.d/mysql.cnf
   rabbitmq:
-    image: rabbitmq:3.12.12
+    image: rabbitmq:4.0.6
     healthcheck:
       test: "rabbitmq-diagnostics -q ping"
       interval: 10s
@@ -86,7 +86,10 @@ services:
       - source: rabbitmq
         target: /etc/rabbitmq/rabbitmq.conf
   nginx:
-    image: ghcr.io/sholex-team/nginx:4.3
+    image: ghcr.io/sholex-team/nginx:4.4
+    dns:
+      - 1.1.1.1
+      - 1.0.0.1
     networks:
       - nginx_lilsholex
     ports:
@@ -102,6 +105,7 @@ services:
       retries: 3
     depends_on:
       - lilsholex
+      - persianmeme
       - celery_flower
     volumes:
       - ./static:/root/lilsholex/static:ro
@@ -140,7 +144,11 @@ services:
       - ssl_key
       - dhparam
   lilsholex:
-    image: ghcr.io/sholex-team/lilsholex:5.8
+    image: ghcr.io/sholex-team/lilsholex:6.0
+    command: "gunicorn --workers=1 --threads=2 --keep-alive=200 --bind=0.0.0.0:80 -t 10 LilSholex.wsgi"
+    dns:
+      - 1.1.1.1
+      - 1.0.0.1
     networks:
       - db_django
       - nginx_lilsholex
@@ -149,6 +157,7 @@ services:
       - tasks_django
     secrets:
       - db_password
+      - persianmeme_id
       - persianmeme_channel
       - persianmeme_reports
       - persianmeme_help_messages
@@ -161,12 +170,62 @@ services:
     depends_on:
       - db
       - migrations
-    healthcheck:
-      test: python healthchecks/gunicorn.py
-      interval: 15s
-      timeout: 5s
-      start_period: 30s
-      retries: 3
+    deploy:
+      replicas: 1
+      placement:
+        preferences:
+           - spread: node.labels.zone
+        constraints:
+          - node.labels.webserver==true
+      update_config:
+        parallelism: 1
+        delay: 5s
+        failure_action: rollback
+        monitor: 5s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        failure_action: pause
+        monitor: 10s
+        order: start-first
+      restart_policy:
+        condition: any
+        max_attempts: 3
+        window: 10s
+        delay: 5s
+  persianmeme:
+    image: ghcr.io/sholex-team/lilsholex:6.0
+    environment:
+      BOT_WEBSERVER: "1"
+      DJANGO_LOG_LEVEL: "ERROR"
+    dns:
+      - 1.1.1.1
+      - 1.0.0.1
+    networks:
+      - db_django
+      - nginx_lilsholex
+      - cache_django
+      - django_internet
+      - tasks_django
+    secrets:
+      - db_password
+      - persianmeme_id
+      - persianmeme_channel
+      - persianmeme_reports
+      - persianmeme_help_messages
+      - persianmeme_token
+      - secret_key
+      - webhook_token
+      - persianmeme_logs
+      - persianmeme_messages
+      - domain
+      - email_config
+    configs:
+      - admins
+    depends_on:
+      - db
+      - migrations
     deploy:
       replicas: 4
       placement:
@@ -192,8 +251,11 @@ services:
         window: 10s
         delay: 5s
   celery: &celery_base
-    image: ghcr.io/sholex-team/lilsholex:5.8
+    image: ghcr.io/sholex-team/lilsholex:6.0
     command: "celery -A LilSholex worker -Q celery -l info -c 2 -E"
+    dns:
+      - 1.1.1.1
+      - 1.0.0.1
     networks:
       - db_django
       - django_internet
@@ -203,6 +265,7 @@ services:
       - secret_key
       - webhook_token
       - persianmeme_token
+      - persianmeme_id
       - persianmeme_channel
       - persianmeme_reports
       - persianmeme_help_messages
@@ -254,7 +317,10 @@ services:
         - django_internet
         - tasks_django
   lilsholex_broadcasts:
-    image: ghcr.io/sholex-team/lilsholex:5.8
+    image: ghcr.io/sholex-team/lilsholex:6.0
+    dns:
+      - 1.1.1.1
+      - 1.0.0.1
     command: "python manage.py process_broadcasts"
     networks:
       - db_django
@@ -264,6 +330,7 @@ services:
       - secret_key
       - webhook_token
       - persianmeme_token
+      - persianmeme_id
       - persianmeme_channel
       - persianmeme_reports
       - persianmeme_help_messages
@@ -296,7 +363,7 @@ services:
         window: 10s
         delay: 5s
   memcached:
-    image: memcached:1.6.23
+    image: memcached:1.6.37
     command: "memcached -m 256"
     networks:
       - cache_django
@@ -325,7 +392,7 @@ services:
         monitor: 10s
         order: start-first
   lilsholex_migrations:
-    image: ghcr.io/sholex-team/lilsholex:5.8
+    image: ghcr.io/sholex-team/lilsholex:6.0
     command: "bash -c 'yes | python manage.py makemigrations persianmeme && \
     yes | python manage.py migrate && python manage.py collectstatic --noinput'"
     secrets:
@@ -333,6 +400,7 @@ services:
       - secret_key
       - webhook_token
       - persianmeme_token
+      - persianmeme_id
       - persianmeme_channel
       - persianmeme_reports
       - persianmeme_help_messages
@@ -404,6 +472,8 @@ volumes:
 secrets:
   db_password:
     external: true
+  persianmeme_id:
+    external: true
   persianmeme_channel:
     external: true
   persianmeme_token:
@@ -428,6 +498,8 @@ secrets:
     file: ./ssl/dhparam.pem
   domain:
     external: true
+  email_config:
+    file: ./secrets/email_config.json
 configs:
   nginx:
     file: conf/nginx.conf # Update Nginx config
@@ -435,3 +507,5 @@ configs:
     file: conf/my.cnf # Change MySQL configuration based on your host.
   rabbitmq:
     file: conf/rabbitmq.conf
+  admins:
+    file: conf/admins.json

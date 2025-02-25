@@ -1,7 +1,8 @@
-from requests import Session
-from .decorators import sync_fix
-from django.conf import settings
+from .decorators import async_fix
 from .exceptions import TooManyRequests
+from aiohttp import ClientResponse
+from .context import telegram as telegram_context
+
 numbers = {
     '0': '0️⃣',
     '1': '1️⃣',
@@ -16,19 +17,24 @@ numbers = {
 }
 
 
-def answer_callback_query(session: Session, token: str):
-    @sync_fix
-    def answer_query(query_id, text, show_alert, cache_time: int = 0):
-        with session.get(
-            f'https://api.telegram.org/bot{token}/answerCallbackQuery',
-            params={'callback_query_id': query_id, 'text': text, 'show_alert': show_alert, 'cache_time': cache_time},
-            timeout=settings.REQUESTS_TIMEOUT
-        ) as response:
-            if response.status_code != 429:
-                return
-            raise TooManyRequests(response.json()['parameters']['retry_after'])
+async def handle_request_exception(response: ClientResponse):
+    if response.status != 429:
+        return
+    raise TooManyRequests((await response.json())['parameters']['retry_after'])
 
-    return answer_query
+
+@async_fix
+async def answer_callback_query(text: str, show_alert: bool, cache_time: int = 0):
+    async with telegram_context.common.HTTP_SESSION.get().get(
+        f'https://api.telegram.org/bot{telegram_context.common.BOT_TOKEN.get()}/answerCallbackQuery',
+        params={
+            'callback_query_id': telegram_context.callback_query.QUERY_ID.get(),
+            'text': text,
+            'show_alert': str(show_alert),
+            'cache_time': cache_time
+        }
+    ) as response:
+        return await handle_request_exception(response)
 
 
 def emoji_number(string_number: str):

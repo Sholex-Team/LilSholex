@@ -1,12 +1,15 @@
 from persianmeme.translations import admin_messages
 from persianmeme.keyboards import admin
-from persianmeme.classes import User
+from asyncio import TaskGroup
+from LilSholex.context.telegram import common as common_context
+from LilSholex.functions import answer_callback_query
 
 
-def handler(chat_id: int, query_id: str, answer_query, inliner: User):
-    inliner.send_message(
-        admin_messages['user_profile'].format(chat_id),
-        admin,
-        parse_mode='Markdown'
-    )
-    answer_query(query_id, admin_messages['user_profile_sent'], False)
+async def handler():
+    async with TaskGroup() as tg:
+        tg.create_task(common_context.USER.get().send_message(
+            admin_messages['user_profile'].format(common_context.CHAT_ID.get()),
+            admin,
+            parse_mode='Markdown'
+        ))
+        tg.create_task(answer_callback_query(admin_messages['user_profile_sent'], False))

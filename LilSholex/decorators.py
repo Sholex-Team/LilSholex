@@ -12,8 +12,10 @@ def async_fix(func):
         while True:
             try:
                 return await func(*args, **kwargs)
+            except TooManyRequests as e:
+                await async_sleep(e.retry_after)
             except ClientError:
-                await async_sleep(0.4)
+                continue
 
     return check_exception
 

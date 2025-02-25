@@ -1,20 +1,23 @@
 from persianmeme.keyboards import admin
 from persianmeme.models import Broadcast, User
 from persianmeme.classes import User as UserClass
+from LilSholex.context import telegram as telegram_context
 
 
-def handler(text: str, message_id: int, user: UserClass):
+async def handler():
+    user: UserClass = telegram_context.common.USER.get()
     try:
-        broadcast = Broadcast.objects.get(id=text)
+        broadcast = await Broadcast.objects.aget(id=telegram_context.message.TEXT.get())
     except (Broadcast.DoesNotExist, ValueError):
-        user.send_message(
-            user.translate('invalid_broadcast_id'), reply_to_message_id=message_id
+        await user.send_message(
+            user.translate('invalid_broadcast_id'),
+            reply_to_message_id=telegram_context.common.MESSAGE_ID.get()
         )
     else:
         user.database.menu = User.Menu.ADMIN_MAIN
-        user.send_message(user.translate(
+        await user.send_message(user.translate(
             'broadcast_status',
             broadcast.id,
             '✅' if broadcast.sent else '❌',
-            User.objects.filter(last_broadcast=broadcast).count()
-        ), admin, message_id)
+            await User.objects.filter(last_broadcast=broadcast).acount()
+        ), admin, telegram_context.common.MESSAGE_ID.get())

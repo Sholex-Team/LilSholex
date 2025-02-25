@@ -3,16 +3,21 @@ from zoneinfo import ZoneInfo
 from datetime import datetime
 from LilSholex import celery_app
 from django.conf import settings
+from asgiref.sync import async_to_sync
+from aiohttp import ClientSession, ClientTimeout
+from LilSholex.context import telegram as telegram_context
+
+
+@async_to_sync
+async def async_to_sync_request(request_func):
+    async with ClientSession(timeout=ClientTimeout(settings.REQUESTS_TIMEOUT)) as session:
+        telegram_context.common.HTTP_SESSION.set(session)
+        await request_func()
 
 
 @celery_app.task
 def revoke_review(meme_id: int):
-    try:
-        target_meme = Meme.objects.get(id=meme_id, reviewed=False, status=Meme.Status.ACTIVE)
-    except Meme.DoesNotExist:
-        return
-    target_meme.review_admin = None
-    target_meme.save()
+    Meme.objects.filter(id=meme_id, reviewed=False, status=Meme.Status.ACTIVE).update(review_admin=None)
 
 
 @celery_app.task
@@ -32,6 +37,6 @@ def check_meme(meme_id: int):
         meme.save()
     else:
         if accept_count >= deny_count:
-            meme.accept()
+            async_to_sync_request(meme.accept)
         else:
-            meme.deny()
+            async_to_sync_request(meme.deny)
